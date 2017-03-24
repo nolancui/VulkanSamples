@@ -1,0 +1,15 @@
+{
+  "file_format_version": "1.0.0",
+  "window": {
+    "width": "500",
+    "height": "500",
+    "fullscreen": "false",
+    "backbuffer": {
+      "number_bb": "2",
+      "format": "R8G8B8A8"
+    }
+  },
+  "depthbuffer": {
+    "format": "D24_S8"
+  }
+}
