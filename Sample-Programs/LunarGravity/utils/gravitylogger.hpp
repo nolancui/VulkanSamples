@@ -14,6 +14,8 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
+ * Author: Mark Young <marky@lunarg.com>
  */
 
 #pragma once
@@ -31,10 +33,9 @@ enum GravityLogLevel {
 };
 
 class GravityLogger {
-public:
-    static GravityLogger& getInstance()
-    {
-        static GravityLogger instance; // Guaranteed to be destroyed. Instantiated on first use.
+   public:
+    static GravityLogger& getInstance() {
+        static GravityLogger instance;  // Guaranteed to be destroyed. Instantiated on first use.
         return instance;
     }
 
@@ -55,7 +56,7 @@ public:
     void LogPerf(std::string message);
     void LogError(std::string message);
 
-private:
+   private:
     GravityLogger();
     virtual ~GravityLogger();
 
@@ -65,7 +66,3 @@ private:
     std::ofstream m_file_stream;
     GravityLogLevel m_log_level;
 };
-
-VKAPI_ATTR VkBool32 VKAPI_CALL LoggerCallback(VkFlags msgFlags, VkDebugReportObjectTypeEXT objType,
-                                              uint64_t srcObject, size_t location, int32_t msgCode,
-                                              const char *pLayerPrefix, const char *pMsg, void *pUserData);

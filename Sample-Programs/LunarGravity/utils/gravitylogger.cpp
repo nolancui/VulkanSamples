@@ -14,36 +14,12 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
+ * Author: Mark Young <marky@lunarg.com>
  */
 
 #include <string>
 #include "gravitylogger.hpp"
-
-VKAPI_ATTR VkBool32 VKAPI_CALL LoggerCallback(VkFlags msgFlags, VkDebugReportObjectTypeEXT objType,
-                                              uint64_t srcObject, size_t location, int32_t msgCode,
-                                              const char *pLayerPrefix, const char *pMsg, void *pUserData) {
-    GravityLogger &logger = GravityLogger::getInstance();
-    std::string message = "Layer: ";
-    message += pLayerPrefix;
-    message += ", Code: ";
-    message += std::to_string(msgCode);
-    message += ", Message: ";
-    message += pMsg;
-
-    if (msgFlags & VK_DEBUG_REPORT_WARNING_BIT_EXT) {
-        logger.LogWarning(message);
-    } else if (msgFlags & VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT) {
-        logger.LogPerf(message);
-    } else if (msgFlags & VK_DEBUG_REPORT_ERROR_BIT_EXT) {
-        logger.LogError(message);
-    } else if (msgFlags & VK_DEBUG_REPORT_DEBUG_BIT_EXT) {
-        logger.LogDebug(message);
-    } else {
-        logger.LogInfo(message);
-    }
-
-    return false;
-}
 
 GravityLogger::GravityLogger() {
     m_output_cmdline = true;
@@ -61,8 +37,7 @@ void GravityLogger::SetFileOutput(std::string output_file) {
     if (output_file.size() > 0) {
         m_file_stream.open(output_file);
         if (m_file_stream.fail()) {
-            std::cerr << "Error failed opening output file stream for "
-                      << output_file << std::endl;
+            std::cerr << "Error failed opening output file stream for " << output_file << std::endl;
             std::cerr << std::flush;
             m_output_file = false;
         } else {

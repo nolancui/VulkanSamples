@@ -14,6 +14,8 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
+ * Author: Mark Young <marky@lunarg.com>
  */
 
 #pragma once
@@ -25,6 +27,7 @@
 class GravityClockWin32 : public GravityClock {
    public:
     GravityClockWin32() : GravityClock() {}
+    virtual ~GravityClockWin32(){};
 
     virtual void Start() {
         QueryPerformanceFrequency(&m_frequency);
@@ -55,9 +58,7 @@ class GravityClockWin32 : public GravityClock {
         }
     }
 
-    virtual void SleepMs(uint32_t milliseconds) {
-        Sleep(milliseconds);
-    }
+    virtual void SleepMs(uint32_t milliseconds) { Sleep(milliseconds); }
 
    private:
     LARGE_INTEGER m_last_comp_time;

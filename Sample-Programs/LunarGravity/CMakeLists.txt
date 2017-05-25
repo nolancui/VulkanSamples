@@ -1,6 +1,8 @@
 include_directories(
     ${CMAKE_CURRENT_BINARY_DIR}
     ${CMAKE_BINARY_DIR}
+    ${JSONCPP_INCLUDE_DIR}
+    engine
     window
     utils
     .
@@ -96,7 +98,7 @@ generate_gravity_spv(simple_single_tex.frag simple_single_tex-fs.spv)
 
 if(WIN32)
 	set(GRAVITY_OS_SOURCES
-      utils/gravityclockwin32.hpp
+        utils/gravityclockwin32.hpp
 	    window/gravitywindowwin32.cpp
 	    window/gravitywindowwin32.hpp
 	    window/gravitywindow.cpp
@@ -104,7 +106,7 @@ if(WIN32)
 	)
 else()
 	set(GRAVITY_OS_SOURCES
-      utils/gravityclocklinux.hpp
+        utils/gravityclocklinux.hpp
 	    window/gravitywindowxcb.cpp
 	    window/gravitywindowxcb.hpp
 	    window/gravitywindowwayland.cpp
@@ -117,15 +119,21 @@ endif()
 add_executable(LunarGravity
                 ${CMAKE_CURRENT_BINARY_DIR}/resources/shaders/simple_single_tex-vs.spv
                 ${CMAKE_CURRENT_BINARY_DIR}/resources/shaders/simple_single_tex-fs.spv
+                ${CMAKE_CURRENT_BINARY_DIR}/resources/gravity.json
+                ${JSONCPP_SOURCE_DIR}/jsoncpp.cpp
                 utils/gravitylogger.cpp
                 utils/gravitylogger.hpp
+                utils/gravitysettingreader.hpp
+                utils/gravitysettingreader.cpp
                 utils/gravityevent.cpp
                 utils/gravityevent.hpp
                 utils/gravityclock.hpp
                 ${GRAVITY_OS_SOURCES}
-                gravitygfxengine.cpp
-                gravitygfxengine.hpp
-                gravityvulkanengine.cpp
-                gravityvulkanengine.hpp
+                engine/gravitygfxengine.cpp
+                engine/gravitygfxengine.hpp
+                engine/gravityvulkanengine.cpp
+                engine/gravityvulkanengine.hpp
+                gravityvulkandemo.cpp
+                gravityvulkandemo.hpp
                 main.cpp)
 target_link_libraries(LunarGravity ${LIBRARIES})

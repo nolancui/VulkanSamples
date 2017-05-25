@@ -14,13 +14,17 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
+ * Author: Mark Young <marky@lunarg.com>
  */
 
 #pragma once
 
 #include <vector>
+#include <string>
 
 class GravityGraphicsEngine;
+class GravityClock;
 
 #include "vulkan/vulkan.h"
 
@@ -28,7 +32,7 @@ class GravityWindow {
     public:
 
         // Create a protected constructor
-        GravityWindow(const char *win_name, const uint32_t width, const uint32_t height, bool fullscreen);
+        GravityWindow(std::string &win_name, GravitySettingGroup *settings, std::vector<std::string> &arguments, GravityClock *clock);
 
         // We don't want any copy constructors
         GravityWindow(const GravityWindow &window) = delete;
@@ -40,20 +44,20 @@ class GravityWindow {
         virtual bool CreateGfxWindow(VkInstance &instance) = 0;
         virtual bool CloseGfxWindow() { return false; }
 
-        void SetFullscreen(bool fullscreen) { m_fullscreen = fullscreen; }
-        bool IsFullscreen() { return m_fullscreen; }
-        virtual void TriggerQuit() = 0;
-
-        void TogglePause() { m_paused = !m_paused; }
-        bool IsPaused() { return m_paused; }
-
         // Make the destructor public
         virtual ~GravityWindow();
 
-        inline VkSurfaceKHR GetSurface() { return m_vk_surface; }
+        virtual bool InitWithSettings(GravityLogger &logger, GravitySettingGroup *settings, std::vector<std::string> &arguments);
+        virtual void AppendUsageString(std::string &usage);
 
+        inline VkSurfaceKHR GetSurface() { return m_vk_surface; }
         uint32_t GetWidth() { return m_width; }
         uint32_t GetHeight() { return m_height; }
+        void SetFullscreen(bool fullscreen) { m_fullscreen = fullscreen; }
+        bool IsFullscreen() { return m_fullscreen; }
+        virtual void TriggerQuit() = 0;
+        void TogglePause() { m_paused = !m_paused; }
+        bool IsPaused() { return m_paused; }
 
     protected:
         uint32_t m_width;
@@ -61,6 +65,7 @@ class GravityWindow {
         bool m_fullscreen;
         bool m_paused;
         GravityGraphicsEngine *m_gfx_engine;
+        GravityClock *m_clock;
         VkSurfaceKHR m_vk_surface;
         char m_win_name[100];
  

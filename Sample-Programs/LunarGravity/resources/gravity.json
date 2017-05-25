@@ -1,15 +1,24 @@
 {
   "file_format_version": "1.0.0",
+  "application": {
+    "name": "Lunar Gravity Demo",
+    "version": "1"
+  },
+  "engine": {
+    "name": "LunarG Gravity Engine",
+    "version": "1",
+    "debug": "on",
+    "loglevel": "warnings",
+    "swap" : {
+      "number_bufs": "2",
+      "fliptype": "Fifo",
+      "format": "B8G8R8A8"
+    },
+    "depthbuffer": "D24_S8"
+  },
   "window": {
     "width": "500",
     "height": "500",
-    "fullscreen": "false",
-    "backbuffer": {
-      "number_bb": "2",
-      "format": "R8G8B8A8"
-    }
-  },
-  "depthbuffer": {
-    "format": "D24_S8"
+    "fullscreen": "false"
   }
 }

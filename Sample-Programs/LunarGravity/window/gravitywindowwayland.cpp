@@ -14,14 +14,17 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
+ * Author: Mark Young <marky@lunarg.com>
  */
 
 #ifdef VK_USE_PLATFORM_WAYLAND_KHR
 
 #include <iostream>
 
-#include "gravitywindowwayland.hpp"
 #include "gravitylogger.hpp"
+#include "gravitysettingreader.hpp"
+#include "gravitywindowwayland.hpp"
 
 static void RegistryHandleGlobal(void *data, struct wl_registry *registry,
                                  uint32_t name, const char *interface,
@@ -55,9 +58,8 @@ static const struct wl_registry_listener registry_listener = {
     RegistryHandleGlobalRemove
 };
 
-GravityWindowWayland::GravityWindowWayland(const char *win_name, const uint32_t width, const uint32_t height,
-                                 bool fullscreen) :
-    GravityWindow(win_name, width, height, fullscreen) {
+GravityWindowWayland::GravityWindowWayland(std::string &win_name, GravitySettingGroup *settings, std::vector<std::string> &arguments, GravityClock *clock) :
+    GravityWindow(win_name, settings, arguments, clock) {
     GravityLogger &logger = GravityLogger::getInstance();
     m_display = wl_display_connect(nullptr);
     if (m_display == nullptr) {

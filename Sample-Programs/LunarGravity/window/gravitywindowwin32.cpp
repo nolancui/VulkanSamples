@@ -14,20 +14,24 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
+ * Author: Mark Young <marky@lunarg.com>
  */
 
 #ifdef VK_USE_PLATFORM_WIN32_KHR
 
 #include <iostream>
 
-#include "gravitywindowwin32.hpp"
 #include "gravitylogger.hpp"
+#include "gravitysettingreader.hpp"
+#include "gravitywindowwin32.hpp"
 #include "gravityevent.hpp"
+#include "gravityclockwin32.hpp"
 
 bool g_is_ready = false;
 
-GravityWindowWin32::GravityWindowWin32(const char *win_name, const uint32_t width, const uint32_t height, bool fullscreen)
-    : GravityWindow(win_name, width, height, fullscreen) {
+GravityWindowWin32::GravityWindowWin32(std::string &win_name, GravitySettingGroup *settings, std::vector<std::string> &arguments, GravityClock *clock)
+    : GravityWindow(win_name, settings, arguments, clock) {
     m_instance = GetModuleHandle(NULL);
 }
 
@@ -245,7 +249,7 @@ bool GravityWindowWin32::CreateGfxWindow(VkInstance &instance) {
     }
 
     while (!g_is_ready) {
-        Sleep(5);
+        static_cast<GravityClockWin32*>(m_clock)->SleepMs(5);
     }
 
     return true;

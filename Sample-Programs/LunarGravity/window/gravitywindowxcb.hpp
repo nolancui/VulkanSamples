@@ -14,6 +14,8 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
+ * Author: Mark Young <marky@lunarg.com>
  */
 
 #pragma once
@@ -30,7 +32,7 @@ class GravityWindowXcb : public GravityWindow {
     public:
 
         // Create a protected constructor
-        GravityWindowXcb(const char *win_name, const uint32_t width, const uint32_t height, bool fullscreen);
+        GravityWindowXcb(std::string &win_name, GravitySettingGroup *settings, std::vector<std::string> &arguments, GravityClock *clock);
 
         // We don't want any copy constructors
         GravityWindowXcb(const GravityWindowXcb &window) = delete;

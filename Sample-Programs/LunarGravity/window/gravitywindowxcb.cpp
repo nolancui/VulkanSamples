@@ -14,18 +14,21 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
+ * Author: Mark Young <marky@lunarg.com>
  */
 
 #ifdef VK_USE_PLATFORM_XCB_KHR
 
 #include <iostream>
 
-#include "gravitywindowxcb.hpp"
 #include "gravitylogger.hpp"
+#include "gravitysettingreader.hpp"
+#include "gravitywindowxcb.hpp"
 #include "gravityevent.hpp"
 
-GravityWindowXcb::GravityWindowXcb(const char *win_name, const uint32_t width, const uint32_t height, bool fullscreen) :
-    GravityWindow(win_name, width, height, fullscreen) {
+GravityWindowXcb::GravityWindowXcb(std::string &win_name, GravitySettingGroup *settings, std::vector<std::string> &arguments, GravityClock *clock) :
+    GravityWindow(win_name, settings, arguments, clock) {
     GravityLogger &logger = GravityLogger::getInstance();
     const xcb_setup_t *setup;
     xcb_screen_iterator_t iter;

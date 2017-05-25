@@ -14,6 +14,8 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
+ * Author: Mark Young <marky@lunarg.com>
  */
 
 #include "gravitylogger.hpp"
@@ -24,8 +26,7 @@ GravityEventList::GravityEventList() {
     m_next = 0;
 }
 
-GravityEventList::~GravityEventList() {
-}
+GravityEventList::~GravityEventList() {}
 
 bool GravityEventList::Alloc(uint16_t size) {
     m_mutex.lock();

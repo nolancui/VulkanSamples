@@ -1,5 +1,5 @@
 /*
- * LunarGravity - gravityclock.hpp
+ * LunarGravity - gravitysettingreader.hpp
  *
  * Copyright (C) 2017 LunarG, Inc.
  *
@@ -20,17 +20,26 @@
 
 #pragma once
 
-class GravityClock {
+#include <vector>
+#include <string>
+
+struct GravitySetting {
+    std::string name;
+    std::string value;
+};
+
+struct GravitySettingGroup {
+    std::string name;
+    std::vector<GravitySetting> settings;
+    std::vector<GravitySettingGroup> groups;
+};
+
+class GravitySettingReader {
    public:
-    GravityClock() { m_paused = true; }
-    virtual ~GravityClock() {}
+    GravitySettingReader() { ; }
+    virtual ~GravitySettingReader() { ; }
 
-    virtual void Start() = 0;
-    virtual void StartGameTime() = 0;
-    virtual void GetTimeDiffMS(float &comp_diff, float &game_diff) = 0;
-    virtual void SleepMs(uint32_t milliseconds) = 0;
-    void PauseGameTime() { m_paused = true; }
+    bool ReadFile(GravityLogger &logger, const char *json_filename, GravitySettingGroup *settings_group);
 
-   protected:
-    bool m_paused;
+   private:
 };

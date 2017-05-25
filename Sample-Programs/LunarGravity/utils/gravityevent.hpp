@@ -14,6 +14,8 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
+ * Author: Mark Young <marky@lunarg.com>
  */
 
 #pragma once
@@ -110,7 +112,7 @@ enum KeyName {
 };
 
 class GravityEvent {
-public:
+   public:
     enum GravityEventType {
         GRAVITY_EVENT_NONE = 0,
         GRAVITY_EVENT_WINDOW_RESIZE,
@@ -119,7 +121,10 @@ public:
         GRAVITY_EVENT_KEY_RELEASE,
     };
 
-    GravityEvent() { m_type = GRAVITY_EVENT_NONE; memset(&data, 0, sizeof(data)); }
+    GravityEvent() {
+        m_type = GRAVITY_EVENT_NONE;
+        memset(&data, 0, sizeof(data));
+    }
     GravityEvent(GravityEventType type) { m_type = type; }
 
     GravityEventType Type() { return m_type; }
@@ -129,19 +134,19 @@ public:
         KeyName key;
     } data;
 
-private:
+   private:
     GravityEventType m_type;
 };
 
 class GravityEventList {
-public:
-    static GravityEventList& getInstance() {
-        static GravityEventList instance; // Guaranteed to be destroyed. Instantiated on first use.
+   public:
+    static GravityEventList &getInstance() {
+        static GravityEventList instance;  // Guaranteed to be destroyed. Instantiated on first use.
         return instance;
     }
 
-    GravityEventList(GravityEventList const&) = delete;
-    void operator=(GravityEventList const&) = delete;
+    GravityEventList(GravityEventList const &) = delete;
+    void operator=(GravityEventList const &) = delete;
 
     bool Alloc(uint16_t size);
     bool SpaceAvailable();
@@ -149,7 +154,7 @@ public:
     bool InsertEvent(GravityEvent &event);
     bool RemoveEvent(GravityEvent &event);
 
-private:
+   private:
     GravityEventList();
     ~GravityEventList();
 

@@ -14,20 +14,23 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
+ * Author: Mark Young <marky@lunarg.com>
  */
 
 #pragma once
 
 #include <time.h>
 #if _POSIX_C_SOURCE < 199309L
-#include <unistd.h> // for usleep
+#include <unistd.h>  // for usleep
 #endif
 
 #include "gravityclock.hpp"
 
 class GravityClockLinux : public GravityClock {
-public:
-    GravityClockLinux() : GravityClock() { }
+   public:
+    GravityClockLinux() : GravityClock() {}
+    virtual ~GravityClockLinux(){};
 
     virtual void Start() {
         timespec current;
@@ -69,16 +72,14 @@ public:
         usleep(milliseconds * 1000);
 #endif
     }
-    
-private:
 
+   private:
     double m_last_comp_time;
     double m_last_game_time;
 
     double GrabCurrentTime(void) {
         timespec current;
         clock_gettime(CLOCK_MONOTONIC, &current);
-        return (static_cast<double>(current.tv_sec) * 1000.0) +
-            (static_cast<double>(current.tv_nsec) * 0.000001);
+        return (static_cast<double>(current.tv_sec) * 1000.0) + (static_cast<double>(current.tv_nsec) * 0.000001);
     }
 };
