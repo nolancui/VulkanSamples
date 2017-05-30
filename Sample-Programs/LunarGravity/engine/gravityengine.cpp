@@ -1,5 +1,5 @@
 /*
- * LunarGravity - gravityvulkanengine.cpp
+ * LunarGravity - gravityengine.cpp
  *
  * Copyright (C) 2017 LunarG, Inc.
  *
@@ -23,14 +23,28 @@
 #include <cstdlib>
 #include <vector>
 #include <cstring>
-
-#include "vk_dispatch_table_helper.h"
+#include <string>
 
 #include "gravitylogger.hpp"
+#include "gravityevent.hpp"
+#include "gravitydevicememory.hpp"
 #include "gravitysettingreader.hpp"
-#include "gravityvulkanengine.hpp"
-#include "gravitywindow.hpp"
+#include "gravityscenesplash.hpp"
+
+#ifdef VK_USE_PLATFORM_XCB_KHR
+#include "gravityclocklinux.hpp"
+#include "gravitywindowxcb.hpp"
+#elif defined(VK_USE_PLATFORM_WAYLAND_KHR)
+#include "gravityclocklinux.hpp"
+#include "gravitywindowwayland.hpp"
+#elif defined(VK_USE_PLATFORM_WIN32_KHR)
+#include "gravityclockwin32.hpp"
+#include "gravitywindowwin32.hpp"
+#else
 #include "gravityclock.hpp"
+#include "graivtywindow.hpp"
+#endif
+#include "gravityengine.hpp"
 
 #ifdef _WIN32
 //#define WIN32_LEAN_AND_MEAN
@@ -40,9 +54,17 @@
 #include <stdlib.h>
 #endif
 
-VKAPI_ATTR VkBool32 VKAPI_CALL VulkanEngineDebugReportCallback(VkFlags msgFlags, VkDebugReportObjectTypeEXT objType,
-                                                               uint64_t srcObject, size_t location, int32_t msgCode,
-                                                               const char *pLayerPrefix, const char *pMsg, void *pUserData) {
+union GravityVersion {
+    struct {
+        uint32_t patch : 12;
+        uint32_t minor : 10;
+        uint32_t major : 10;
+    };
+    uint32_t u_version;
+};
+VKAPI_ATTR VkBool32 VKAPI_CALL ThisDebugReportCallback(VkFlags msgFlags, VkDebugReportObjectTypeEXT objType, uint64_t srcObject,
+                                                       size_t location, int32_t msgCode, const char *pLayerPrefix, const char *pMsg,
+                                                       void *pUserData) {
     GravityLogger &logger = GravityLogger::getInstance();
     std::string message = "Layer: ";
     message += pLayerPrefix;
@@ -66,9 +88,144 @@ VKAPI_ATTR VkBool32 VKAPI_CALL VulkanEngineDebugReportCallback(VkFlags msgFlags,
     return false;
 }
 
-bool GravityVulkanEngine::Init(std::vector<std::string> &arguments) {
-    // Use the parent's call first.
-    if (!GravityGraphicsEngine::Init(arguments)) {
+bool GravityEngine::Init(std::vector<std::string> &arguments) {
+    bool app_name_found = false;
+    bool app_settings_found = false;
+    bool app_version_found = false;
+    GravityLogger &logger = GravityLogger::getInstance();
+    std::string start_scene = "";
+    GravityVersion cur_version;
+
+    if (m_settings == nullptr) {
+        goto out;
+    }
+    for (auto cur_group : m_settings->groups) {
+        // We only want the name and version out of the application data
+        if (cur_group.name == "application") {
+            for (auto app_group : cur_group.groups) {
+                if (app_group.name == "version") {
+                    cur_version.u_version = 0;
+                    for (auto version_setting : app_group.settings) {
+                        if (version_setting.name == "major") {
+                            cur_version.major = atoi(version_setting.value.c_str());
+                        } else if (version_setting.name == "minor") {
+                            cur_version.minor = atoi(version_setting.value.c_str());
+                        } else if (version_setting.name == "patch") {
+                            cur_version.patch = atoi(version_setting.value.c_str());
+                        }
+                    }
+                    m_app_version = cur_version.u_version;
+                    app_version_found = true;
+                }
+            }
+            for (auto app_setting : cur_group.settings) {
+                if (app_setting.name == "name") {
+                    m_app_name = app_setting.value;
+                    app_name_found = true;
+                } else if (app_setting.name == "starting scene") {
+                    start_scene = app_setting.value;
+                    app_settings_found = true;
+                }
+                if (app_name_found && app_version_found && app_settings_found) {
+                    break;
+                }
+            }
+        } else if (cur_group.name == "engine") {
+            for (auto eng_group : cur_group.groups) {
+                if (eng_group.name == "version") {
+                    cur_version.u_version = 0;
+                    for (auto version_setting : eng_group.settings) {
+                        if (version_setting.name == "major") {
+                            cur_version.major = atoi(version_setting.value.c_str());
+                        } else if (version_setting.name == "minor") {
+                            cur_version.minor = atoi(version_setting.value.c_str());
+                        } else if (version_setting.name == "patch") {
+                            cur_version.patch = atoi(version_setting.value.c_str());
+                        }
+                    }
+                    m_engine_version = cur_version.u_version;
+                }
+            }
+            for (auto cur_setting : cur_group.settings) {
+                if (cur_setting.name == "name") {
+                    m_engine_name = cur_setting.value;
+                } else if (cur_setting.name == "debug") {
+                    if (cur_setting.value == "off") {
+                        m_debug_enabled = false;
+                    } else if (cur_setting.value == "on") {
+                        m_debug_enabled = true;
+                    }
+                } else if (cur_setting.name == "loglevel") {
+                    if (cur_setting.value == "errors") {
+                        logger.SetLogLevel(GRAVITY_LOG_ERROR);
+                    } else if (cur_setting.value == "warnings") {
+                        logger.SetLogLevel(GRAVITY_LOG_WARN_ERROR);
+                    } else if (cur_setting.value == "info") {
+                        logger.SetLogLevel(GRAVITY_LOG_INFO_WARN_ERROR);
+                    } else if (cur_setting.value == "all") {
+                        logger.SetLogLevel(GRAVITY_LOG_ALL);
+                    }
+                }
+            }
+        }
+    }
+
+    for (uint32_t arg = 1; arg < arguments.size(); arg++) {
+        const char *parg = arguments[arg].c_str();
+        if (arguments[arg] == "--help" || parg[0] != '-' || parg[1] != '-') {
+            m_print_usage = true;
+            break;
+        } else if (arguments[arg] == "--debug") {
+            m_debug_enabled = true;
+        } else if (arguments[arg] == "--nopopups") {
+            logger.TogglePopups(false);
+        } else if (arguments[arg] == "--loglevel") {
+            if (arg < arguments.size() - 1) {
+                arg++;
+                if (arguments[arg] == "warn") {
+                    logger.SetLogLevel(GRAVITY_LOG_WARN_ERROR);
+                } else if (arguments[arg] == "info") {
+                    logger.SetLogLevel(GRAVITY_LOG_INFO_WARN_ERROR);
+                } else if (arguments[arg] == "all") {
+                    logger.SetLogLevel(GRAVITY_LOG_ALL);
+                } else {
+                    m_print_usage = true;
+                }
+            } else {
+                m_print_usage = true;
+            }
+        }
+    }
+
+#if defined(VK_USE_PLATFORM_XCB_KHR) || defined(VK_USE_PLATFORM_WAYLAND_KHR)
+    m_clock = new GravityClockLinux();
+#elif defined(VK_USE_PLATFORM_WIN32_KHR)
+    m_clock = new GravityClockWin32();
+#else
+    m_clock = new GravityClock();
+#endif
+
+#ifdef VK_USE_PLATFORM_XCB_KHR
+    m_window = new GravityWindowXcb(m_app_name, m_settings, arguments, m_clock);
+#elif defined(VK_USE_PLATFORM_WAYLAND_KHR)
+    m_window = new GravityWindowWayland(m_app_name, m_settings, arguments, m_clock);
+#elif defined(VK_USE_PLATFORM_WIN32_KHR)
+    m_window = new GravityWindowWin32(m_app_name, m_settings, arguments, m_clock);
+#else
+#error "Unsupported Window format!"
+#endif
+
+    m_cur_frame = 0;
+
+    if (start_scene.size() == 0) {
+        logger.LogError("Could not find start scene in settings file!");
+        goto out;
+    } else {
+        // Create the starting scene
+        m_cur_scene = GravityScene::LoadScene(start_scene, m_inst_ext_if, m_dev_ext_if);
+    }
+
+    if (m_clock == nullptr || m_window == nullptr || m_cur_scene == nullptr) {
         goto out;
     }
 
@@ -83,9 +240,9 @@ bool GravityVulkanEngine::Init(std::vector<std::string> &arguments) {
             for (auto sub_group : cur_group.groups) {
                 if (sub_group.name == "swap") {
                     for (auto cur_swap_setting : sub_group.settings) {
-                        if (cur_swap_setting.name == "number_bufs") {
+                        if (cur_swap_setting.name == "number buffers") {
                             m_num_backbuffers = atoi(cur_swap_setting.value.c_str());
-                        } else if (cur_swap_setting.name == "fliptype") {
+                        } else if (cur_swap_setting.name == "flip type") {
                             if (cur_swap_setting.value == "Fifo") {
                                 m_swapchain_surface.present_mode = VK_PRESENT_MODE_FIFO_KHR;
                             } else if (cur_swap_setting.value == "Fifo_Relaxed") {
@@ -158,12 +315,47 @@ out:
     }
 }
 
-void GravityVulkanEngine::AppendUsageString(std::string &usage) {
-    GravityGraphicsEngine::AppendUsageString(usage);
+void GravityEngine::AppendUsageString(std::string &usage) {
+    usage += "\t\t--help\t\t\t\tPrint out this usage information\n";
+    usage += "\t\t--debug\t\t\t\tEnable debugging\n";
+    usage += "\t\t--loglevel [warn, info, all]\tEnable logging of provided level and above.\n";
+    usage += "\t\t--nopopups\t\t\tDisable warning/error pop-ups on Windows\n";
     usage += "\t\t--backbuffers val\t\tNumber of backbuffers to use (2=double buffering, 3=triple, etc)\n";
 }
 
-GravityVulkanEngine::GravityVulkanEngine() : GravityGraphicsEngine() {
+void GravityEngine::PrintUsage(std::string &usage) {
+    std::cout << usage.c_str() << std::endl;
+    exit(-1);
+}
+
+GravityEngine::GravityEngine() {
+    GravitySettingReader settings_reader;
+    GravityLogLevel log_level = GRAVITY_LOG_ERROR;
+    m_print_usage = false;
+    m_app_name = "";
+    m_app_version = 0;
+    m_engine_name = "";
+    m_engine_version = 0;
+    m_debug_enabled = false;
+    m_quit = false;
+    m_paused = false;
+    m_num_phys_devs = 0;
+    m_num_backbuffers = 2;
+    m_cur_scene = nullptr;
+    m_next_scene = nullptr;
+    m_dev_memory = nullptr;
+
+    GravityLogger &logger = GravityLogger::getInstance();
+    logger.SetLogLevel(log_level);
+    logger.TogglePopups(true);
+
+    GravityEventList &event_list = GravityEventList::getInstance();
+    event_list.Alloc(32);
+
+    m_settings = new GravitySettingGroup();
+    if (m_settings != nullptr && !settings_reader.ReadFile(logger, "resources/gravity.json", m_settings)) {
+        logger.LogWarning("GravityEngine failed to read settings file on init");
+    }
     m_validation_enabled = false;
     m_depth_stencil_surface.image_view = VK_NULL_HANDLE;
     m_depth_stencil_surface.image = VK_NULL_HANDLE;
@@ -171,11 +363,11 @@ GravityVulkanEngine::GravityVulkanEngine() : GravityGraphicsEngine() {
     m_quit = false;
 }
 
-GravityVulkanEngine::~GravityVulkanEngine() {
+GravityEngine::~GravityEngine() {
     GravityLogger &logger = GravityLogger::getInstance();
     GravityLogLevel level = logger.GetLogLevel();
-    if (level > GRAVITY_LOG_DISABLE) {
-        m_vk_inst_dispatch_table.DestroyDebugReportCallbackEXT(m_vk_inst, m_dbg_report_callback, nullptr);
+    if (level > GRAVITY_LOG_DISABLE && NULL != m_inst_ext_if) {
+        m_inst_ext_if->DestroyDebugReportCallbackEXT(m_vk_inst, m_dbg_report_callback, nullptr);
     }
 
     CleanupDepthStencilSurface();
@@ -190,10 +382,118 @@ GravityVulkanEngine::~GravityVulkanEngine() {
     vkDestroyDevice(m_vk_device, NULL);
     vkDestroySurfaceKHR(m_vk_inst, m_window->GetSurface(), NULL);
     vkDestroyInstance(m_vk_inst, NULL);
+
+    if (nullptr != m_cur_scene) {
+        delete m_cur_scene;
+        m_cur_scene = nullptr;
+    }
+    if (nullptr != m_next_scene) {
+        delete m_next_scene;
+        m_next_scene = nullptr;
+    }
+    if (nullptr != m_settings) {
+        delete m_settings;
+        m_settings = nullptr;
+    }
+    if (nullptr != m_clock) {
+#if defined(VK_USE_PLATFORM_XCB_KHR) || defined(VK_USE_PLATFORM_WAYLAND_KHR)
+        GravityClockLinux *clock = reinterpret_cast<GravityClockLinux *>(m_clock);
+        delete clock;
+#elif defined(VK_USE_PLATFORM_WIN32_KHR)
+        GravityClockWin32 *clock = reinterpret_cast<GravityClockWin32 *>(m_clock);
+        delete clock;
+        m_clock = new GravityClockWin32();
+#else
+        delete m_clock;
+#endif
+
+        m_clock = nullptr;
+    }
+    if (nullptr != m_window) {
+        delete m_window;
+        m_window = nullptr;
+    }
 }
 
-bool GravityVulkanEngine::QueryWindowSystem(std::vector<VkExtensionProperties> &ext_props, uint32_t &ext_count,
-                                            const char **desired_extensions) {
+GravitySystemBatteryStatus GravityEngine::SystemBatteryStatus(void) {
+    GravitySystemBatteryStatus cur_status = GRAVITY_BATTERY_STATUS_NONE;
+
+#ifdef _WIN32
+    SYSTEM_POWER_STATUS status;
+    if (GetSystemPowerStatus(&status)) {
+        switch (status.BatteryFlag) {
+            default:
+                break;
+            case 0:
+                cur_status = GRAVITY_BATTERY_STATUS_DISCHARGING_MID;
+                break;
+            case 1:
+                cur_status = GRAVITY_BATTERY_STATUS_DISCHARGING_HIGH;
+                break;
+            case 2:
+                cur_status = GRAVITY_BATTERY_STATUS_DISCHARGING_LOW;
+                break;
+            case 4:
+                cur_status = GRAVITY_BATTERY_STATUS_DISCHARGING_CRITICAL;
+                break;
+            case 8:
+                cur_status = GRAVITY_BATTERY_STATUS_CHARGING;
+                break;
+        }
+    }
+
+#elif defined __ANDROID__
+
+#error "No Android support!"
+
+#else
+
+    // Check Linux battery level using ACPI:
+    //  acpi -b output:
+    //      Battery 0: Full, 100%
+    //      Battery 0: Discharging, 95%, 10:32:44 remaining
+    //      Battery 0: Charging, 94%, rate information unavailable
+    const char battery_check_string[] = "acpi -b | awk -F'[, ]' '{ print $3 }'";
+    const char power_level_string[] = "acpi -b | grep -P -o '[0-9]+(?=%)'";
+    char result[256];
+    FILE *fp = popen(battery_check_string, "r");
+    if (fp != NULL) {
+        bool discharging = false;
+        if (fgets(result, sizeof(result) - 1, fp) != NULL) {
+            if (NULL != strstr(result, "Charging")) {
+                cur_status = GRAVITY_BATTERY_STATUS_CHARGING;
+            } else if (NULL != strstr(result, "Discharging")) {
+                discharging = true;
+            }
+        }
+        pclose(fp);
+        if (discharging) {
+            fp = popen(power_level_string, "r");
+            if (fp != NULL) {
+                if (fgets(result, sizeof(result) - 1, fp) != NULL) {
+                    int32_t battery_perc = atoi(result);
+                    if (battery_perc > 66) {
+                        cur_status = GRAVITY_BATTERY_STATUS_DISCHARGING_HIGH;
+                    } else if (battery_perc > 33) {
+                        cur_status = GRAVITY_BATTERY_STATUS_DISCHARGING_MID;
+                    } else if (battery_perc > 5) {
+                        cur_status = GRAVITY_BATTERY_STATUS_DISCHARGING_LOW;
+                    } else {
+                        cur_status = GRAVITY_BATTERY_STATUS_DISCHARGING_CRITICAL;
+                    }
+                }
+                pclose(fp);
+            }
+        }
+    }
+
+#endif
+
+    return cur_status;
+}
+
+bool GravityEngine::QueryWindowSystem(std::vector<VkExtensionProperties> &ext_props, uint32_t &ext_count,
+                                      const char **desired_extensions) {
     bool khr_surface_found = false;
 #if defined(VK_USE_PLATFORM_WIN32_KHR)
     bool khr_win32_surface_found = false;
@@ -226,7 +526,7 @@ bool GravityVulkanEngine::QueryWindowSystem(std::vector<VkExtensionProperties> &
 
     if (ext_count == 0) {
         std::string error_msg =
-            "GravityVulkanEngine::QueryWindowSystem incoming `ext_count` needs to contain"
+            "GravityEngine::QueryWindowSystem incoming `ext_count` needs to contain"
             " size of 'desired_extensions' array";
         logger.LogError(error_msg);
         return false;
@@ -286,13 +586,13 @@ bool GravityVulkanEngine::QueryWindowSystem(std::vector<VkExtensionProperties> &
     }
 
     if (count < 2) {
-        std::string error_msg = "GravityVulkanEngine::QueryWindowSystem failed to find a platform extension (count = ";
+        std::string error_msg = "GravityEngine::QueryWindowSystem failed to find a platform extension (count = ";
         error_msg += count;
         error_msg += ").";
         logger.LogError(error_msg);
         return false;
     } else if (count > ext_count) {
-        std::string error_msg = "GravityVulkanEngine::QueryWindowSystem found too many extensions.  Expected < ";
+        std::string error_msg = "GravityEngine::QueryWindowSystem found too many extensions.  Expected < ";
         error_msg += ext_count;
         error_msg += ", but got ";
         error_msg += count;
@@ -354,7 +654,7 @@ bool GravityVulkanEngine::QueryWindowSystem(std::vector<VkExtensionProperties> &
     return true;
 }
 
-int GravityVulkanEngine::CompareGpus(VkPhysicalDeviceProperties &gpu_0, VkPhysicalDeviceProperties &gpu_1) {
+int GravityEngine::CompareGpus(VkPhysicalDeviceProperties &gpu_0, VkPhysicalDeviceProperties &gpu_1) {
     int gpu_to_use = 1;
     bool determined = false;
 
@@ -399,7 +699,7 @@ int GravityVulkanEngine::CompareGpus(VkPhysicalDeviceProperties &gpu_0, VkPhysic
     return gpu_to_use;
 }
 
-bool GravityVulkanEngine::SetupInitalGraphicsDevice() {
+bool GravityEngine::SetupInitalGraphicsDevice() {
     VkApplicationInfo vk_app_info = {};
     VkInstanceCreateInfo vk_inst_create_info = {};
     VkResult vk_result;
@@ -457,32 +757,32 @@ bool GravityVulkanEngine::SetupInitalGraphicsDevice() {
     vk_result = vkEnumerateInstanceExtensionProperties(nullptr, &count, nullptr);
     if (VK_SUCCESS != vk_result || count == 0) {
         std::string error_msg =
-            "GravityVulkanEngine::GravityVulkanEngine failed to query "
+            "GravityEngine::GravityEngine failed to query "
             "vkEnumerateInstanceExtensionProperties first time with error ";
         error_msg += vk_result;
         error_msg += " and count ";
         error_msg += std::to_string(count);
         logger.LogError(error_msg);
-        exit(-1);
+        return false;
     }
 
     extension_properties.resize(count);
     vk_result = vkEnumerateInstanceExtensionProperties(nullptr, &count, extension_properties.data());
     if (VK_SUCCESS != vk_result || count == 0) {
         std::string error_msg =
-            "GravityVulkanEngine::GravityVulkanEngine failed to query "
+            "GravityEngine::GravityEngine failed to query "
             "vkEnumerateInstanceExtensionProperties with count ";
         error_msg += std::to_string(count);
         error_msg += " error ";
         error_msg += vk_result;
         logger.LogError(error_msg);
-        exit(-1);
+        return false;
     }
 
     enable_extension_count = count;
     if (!QueryWindowSystem(extension_properties, enable_extension_count, extensions_to_enable)) {
-        logger.LogError("Failed GravityVulkanEngine::GravityVulkanEngine QueryWindowSystem");
-        exit(-1);
+        logger.LogError("Failed GravityEngine::GravityEngine QueryWindowSystem");
+        return false;
     }
 
     bool found_debug_report = false;
@@ -494,8 +794,8 @@ bool GravityVulkanEngine::SetupInitalGraphicsDevice() {
         }
     }
     if (!found_debug_report && m_debug_enabled) {
-        logger.LogError("::GravityVulkanEngine could not find debug extension");
-        exit(-1);
+        logger.LogError("GravityEngine::GravityEngine could not find debug extension");
+        return false;
     }
 
     VkDebugReportCallbackCreateInfoEXT dbg_create_info = {};
@@ -504,7 +804,7 @@ bool GravityVulkanEngine::SetupInitalGraphicsDevice() {
     if (level > GRAVITY_LOG_DISABLE) {
         dbg_create_info.sType = VK_STRUCTURE_TYPE_DEBUG_REPORT_CREATE_INFO_EXT;
         dbg_create_info.pNext = nullptr;
-        dbg_create_info.pfnCallback = VulkanEngineDebugReportCallback;
+        dbg_create_info.pfnCallback = ThisDebugReportCallback;
         dbg_create_info.pUserData = this;
         switch (level) {
             case GRAVITY_LOG_ALL:
@@ -533,47 +833,45 @@ bool GravityVulkanEngine::SetupInitalGraphicsDevice() {
     vk_result = vkCreateInstance(&vk_inst_create_info, nullptr, &m_vk_inst);
     if (vk_result == VK_ERROR_INCOMPATIBLE_DRIVER) {
         logger.LogError(
-            "GravityVulkanEngine::GravityVulkanEngine failed vkCreateInstance could not find a "
+            "GravityEngine::GravityEngine failed vkCreateInstance could not find a "
             "compatible Vulkan ICD");
-        exit(-1);
+        return false;
     } else if (vk_result == VK_ERROR_EXTENSION_NOT_PRESENT) {
         logger.LogError(
-            "GravityVulkanEngine::GravityVulkanEngine failed vkCreateInstance could not find "
+            "GravityEngine::GravityEngine failed vkCreateInstance could not find "
             "one or more extensions");
-        exit(-1);
+        return false;
     } else if (vk_result) {
-        std::string error_msg = "GravityVulkanEngine::GravityVulkanEngine failed vkCreateInstance ";
+        std::string error_msg = "GravityEngine::GravityEngine failed vkCreateInstance ";
         error_msg += vk_result;
         error_msg += " encountered while attempting to create instance";
         logger.LogError(error_msg);
-        exit(-1);
+        return false;
     }
 
-    // Hijack the layer dispatch table init and use it
-    layer_init_instance_dispatch_table(m_vk_inst, &m_vk_inst_dispatch_table, vkGetInstanceProcAddr);
+    m_inst_ext_if = new GravityInstanceExtIf(m_vk_inst);
+    if (NULL == m_inst_ext_if) {
+        logger.LogError("GravityEngine::GravityEngine failed allocating GravityInstanceExtIf");
+        return false;
+    }
 
     if (level > GRAVITY_LOG_DISABLE) {
-        vk_result =
-            m_vk_inst_dispatch_table.CreateDebugReportCallbackEXT(m_vk_inst, &dbg_create_info, nullptr, &m_dbg_report_callback);
+        vk_result = m_inst_ext_if->CreateDebugReportCallbackEXT(m_vk_inst, &dbg_create_info, nullptr, &m_dbg_report_callback);
         if (vk_result != VK_SUCCESS) {
-            std::string error_msg =
-                "GravityVulkanEngine::GravityVulkanEngine failed call to "
-                "CreateDebugReportCallback with error";
+            std::string error_msg = "GravityEngine::GravityEngine failed call to CreateDebugReportCallback with error";
             error_msg += vk_result;
             logger.LogError(error_msg);
-            exit(-1);
+            return false;
         }
     }
     vk_result = vkEnumeratePhysicalDevices(m_vk_inst, &m_num_phys_devs, nullptr);
     if (VK_SUCCESS != vk_result || m_num_phys_devs == 0) {
-        std::string error_msg =
-            "GravityVulkanEngine::GravityVulkanEngine failed to query "
-            "vkEnumeratePhysicalDevices first time with error ";
+        std::string error_msg = "GravityEngine::GravityEngine failed to query vkEnumeratePhysicalDevices first time with error ";
         error_msg += vk_result;
         error_msg += " and count ";
         error_msg += std::to_string(m_num_phys_devs);
         logger.LogError(error_msg);
-        exit(-1);
+        return false;
     }
 
     memset(extensions_to_enable, 0, sizeof(extensions_to_enable));
@@ -582,7 +880,7 @@ bool GravityVulkanEngine::SetupInitalGraphicsDevice() {
     vk_result = vkEnumeratePhysicalDevices(m_vk_inst, &m_num_phys_devs, physical_devices.data());
     if (VK_SUCCESS != vk_result || m_num_phys_devs == 0) {
         std::string error_msg =
-            "GravityVulkanEngine::SetupInitalGraphicsDevice failed to query "
+            "GravityEngine::SetupInitalGraphicsDevice failed to query "
             "vkEnumeratePhysicalDevices with count ";
         error_msg += std::to_string(m_num_phys_devs);
         error_msg += " error ";
@@ -667,13 +965,17 @@ bool GravityVulkanEngine::SetupInitalGraphicsDevice() {
         return false;
     }
 
-    // Get Memory information and properties
-    vkGetPhysicalDeviceMemoryProperties(m_vk_phys_dev, &m_vk_dev_mem_props);
+    m_dev_memory = new GravityDeviceMemory(m_inst_ext_if, &m_vk_phys_dev);
+    if (nullptr == m_dev_memory) {
+        logger.LogError(
+            "GravityEngine::GravityEngine failed creating GravityDeviceMemory");
+        return false;
+    }
 
     vk_result = vkEnumerateDeviceExtensionProperties(m_vk_phys_dev, nullptr, &count, nullptr);
     if (VK_SUCCESS != vk_result || count == 0) {
         std::string error_msg =
-            "GravityVulkanEngine::SetupInitalGraphicsDevice failed to query "
+            "GravityEngine::SetupInitalGraphicsDevice failed to query "
             "vkEnumerateDeviceExtensionProperties first time with error ";
         error_msg += vk_result;
         error_msg += " and count ";
@@ -686,7 +988,7 @@ bool GravityVulkanEngine::SetupInitalGraphicsDevice() {
     vk_result = vkEnumerateDeviceExtensionProperties(m_vk_phys_dev, nullptr, &count, extension_properties.data());
     if (VK_SUCCESS != vk_result || count == 0) {
         std::string error_msg =
-            "GravityVulkanEngine::SetupInitalGraphicsDevice failed to query "
+            "GravityEngine::SetupInitalGraphicsDevice failed to query "
             "vkEnumerateDeviceExtensionProperties with count ";
         error_msg += std::to_string(count);
         error_msg += " error ";
@@ -705,7 +1007,7 @@ bool GravityVulkanEngine::SetupInitalGraphicsDevice() {
     }
 
     if (!found_swapchain) {
-        std::string error_msg = "GravityVulkanEngine::SetupInitalGraphicsDevice failed to find necessary extension ";
+        std::string error_msg = "GravityEngine::SetupInitalGraphicsDevice failed to find necessary extension ";
         error_msg += VK_KHR_SWAPCHAIN_EXTENSION_NAME;
         logger.LogError(error_msg);
         return false;
@@ -714,7 +1016,7 @@ bool GravityVulkanEngine::SetupInitalGraphicsDevice() {
     vkGetPhysicalDeviceQueueFamilyProperties(m_vk_phys_dev, &queue_family_count, nullptr);
     if (queue_family_count == 0) {
         std::string error_msg =
-            "GravityVulkanEngine::SetupInitalGraphicsDevice failed to query "
+            "GravityEngine::SetupInitalGraphicsDevice failed to query "
             "vkGetPhysicalDeviceQueueFamilyProperties first time with count ";
         error_msg += std::to_string(queue_family_count);
         logger.LogError(error_msg);
@@ -732,8 +1034,8 @@ bool GravityVulkanEngine::SetupInitalGraphicsDevice() {
     std::vector<VkBool32> present_support;
     present_support.resize(queue_family_count);
     for (uint32_t queue_family = 0; queue_family < queue_family_count; queue_family++) {
-        m_vk_inst_dispatch_table.GetPhysicalDeviceSurfaceSupportKHR(m_vk_phys_dev, queue_family, m_window->GetSurface(),
-                                                                    &present_support[queue_family]);
+        m_inst_ext_if->GetPhysicalDeviceSurfaceSupportKHR(m_vk_phys_dev, queue_family, m_window->GetSurface(),
+                                                          &present_support[queue_family]);
     }
 
     // Search for a graphics and a present queue in the array of queue
@@ -757,7 +1059,7 @@ bool GravityVulkanEngine::SetupInitalGraphicsDevice() {
 
     if (UINT32_MAX == m_graphics_queue.family_index || UINT32_MAX == m_present_queue.family_index) {
         std::string error_msg =
-            "GravityVulkanEngine::SetupInitalGraphicsDevice failed to find either "
+            "GravityEngine::SetupInitalGraphicsDevice failed to find either "
             "a graphics or present queue for physical device.";
         logger.LogError(error_msg);
         return false;
@@ -797,16 +1099,16 @@ bool GravityVulkanEngine::SetupInitalGraphicsDevice() {
     vk_result = vkCreateDevice(m_vk_phys_dev, &device_create_info, nullptr, &m_vk_device);
     if (vk_result == VK_ERROR_INCOMPATIBLE_DRIVER) {
         logger.LogError(
-            "GravityVulkanEngine::SetupInitalGraphicsDevice failed vkCreateDevice could not find a "
+            "GravityEngine::SetupInitalGraphicsDevice failed vkCreateDevice could not find a "
             "compatible Vulkan ICD");
         return false;
     } else if (vk_result == VK_ERROR_EXTENSION_NOT_PRESENT) {
         logger.LogError(
-            "GravityVulkanEngine::SetupInitalGraphicsDevice failed vkCreateDevice could not find "
+            "GravityEngine::SetupInitalGraphicsDevice failed vkCreateDevice could not find "
             "one or more extensions");
         return false;
     } else if (VK_SUCCESS != vk_result) {
-        std::string error_msg = "GravityVulkanEngine::SetupInitalGraphicsDevice failed vkCreateDevice with ";
+        std::string error_msg = "GravityEngine::SetupInitalGraphicsDevice failed vkCreateDevice with ";
         error_msg += vk_result;
         logger.LogError(error_msg);
         return false;
@@ -818,8 +1120,19 @@ bool GravityVulkanEngine::SetupInitalGraphicsDevice() {
         vkGetDeviceQueue(m_vk_device, m_present_queue.family_index, 0, &m_present_queue.vk_queue);
     }
 
-    // Again, hijack the layer mechanism for creating a device dispatch table.
-    layer_init_device_dispatch_table(m_vk_device, &m_vk_dev_dispatch_table, vkGetDeviceProcAddr);
+    m_dev_ext_if = new GravityDeviceExtIf(m_vk_device);
+    if (NULL == m_dev_ext_if) {
+        logger.LogError("GravityEngine::SetupInitalGraphicsDevice failed allocating GravityDeviceExtIf");
+        return false;
+    }
+    m_dev_memory = new GravityDeviceMemory(m_inst_ext_if, &m_vk_phys_dev);
+    if (nullptr == m_dev_memory) {
+        logger.LogError(
+            "GravityEngine::GravityEngine failed creating GravityDeviceMemory");
+        return false;
+    }
+
+    m_dev_memory->SetupDevIf(m_dev_ext_if);
 
     // Create a command pool so we can allocate one or more command buffers out of it.
     VkCommandPoolCreateInfo cmd_pool_create_info = {};
@@ -829,7 +1142,7 @@ bool GravityVulkanEngine::SetupInitalGraphicsDevice() {
     cmd_pool_create_info.flags = 0;
     vk_result = vkCreateCommandPool(m_vk_device, &cmd_pool_create_info, nullptr, &m_vk_graphics_cmd_pool);
     if (VK_SUCCESS != vk_result) {
-        std::string error_msg = "GravityVulkanEngine::SetupInitalGraphicsDevice failed vkCreateCommandPool with ";
+        std::string error_msg = "GravityEngine::SetupInitalGraphicsDevice failed vkCreateCommandPool with ";
         error_msg += vk_result;
         logger.LogError(error_msg);
         return false;
@@ -846,7 +1159,7 @@ bool GravityVulkanEngine::SetupInitalGraphicsDevice() {
     cmd_buf_alloc_info.commandBufferCount = 1;
     vk_result = vkAllocateCommandBuffers(m_vk_device, &cmd_buf_alloc_info, &cmd_buffer);
     if (VK_SUCCESS != vk_result) {
-        std::string error_msg = "GravityVulkanEngine::SetupInitalGraphicsDevice failed vkAllocateCommandBuffers with ";
+        std::string error_msg = "GravityEngine::SetupInitalGraphicsDevice failed vkAllocateCommandBuffers with ";
         error_msg += vk_result;
         logger.LogError(error_msg);
         return false;
@@ -860,7 +1173,7 @@ bool GravityVulkanEngine::SetupInitalGraphicsDevice() {
         cmd_pool_create_info.queueFamilyIndex = m_present_queue.family_index;
         vk_result = vkCreateCommandPool(m_vk_device, &cmd_pool_create_info, nullptr, &m_vk_present_cmd_pool);
         if (VK_SUCCESS != vk_result) {
-            std::string error_msg = "GravityVulkanEngine::SetupInitalGraphicsDevice failed vkCreateCommandPool with ";
+            std::string error_msg = "GravityEngine::SetupInitalGraphicsDevice failed vkCreateCommandPool with ";
             error_msg += vk_result;
             error_msg += " for present command pool";
             logger.LogError(error_msg);
@@ -877,7 +1190,7 @@ bool GravityVulkanEngine::SetupInitalGraphicsDevice() {
     cmd_buf_begin_info.pInheritanceInfo = nullptr;
     vk_result = vkBeginCommandBuffer(cmd_buffer, &cmd_buf_begin_info);
     if (VK_SUCCESS != vk_result) {
-        std::string error_msg = "GravityVulkanEngine::SetupInitalGraphicsDevice failed vkBeginCommandBuffer with ";
+        std::string error_msg = "GravityEngine::SetupInitalGraphicsDevice failed vkBeginCommandBuffer with ";
         error_msg += vk_result;
         logger.LogError(error_msg);
         return false;
@@ -914,7 +1227,7 @@ bool GravityVulkanEngine::SetupInitalGraphicsDevice() {
         for (uint32_t iii = 0; iii < m_swapchain_surface.swapchain_images.size(); iii++) {
             vk_result = vkAllocateCommandBuffers(m_vk_device, &cmd_buf_alloc_info, &cmd_buffer);
             if (VK_SUCCESS != vk_result) {
-                std::string error_msg = "GravityVulkanEngine::SetupInitalGraphicsDevice failed vkAllocateCommandBuffers with ";
+                std::string error_msg = "GravityEngine::SetupInitalGraphicsDevice failed vkAllocateCommandBuffers with ";
                 error_msg += vk_result;
                 error_msg += " for present command buffer ";
                 error_msg += std::to_string(iii);
@@ -925,7 +1238,7 @@ bool GravityVulkanEngine::SetupInitalGraphicsDevice() {
 
             vk_result = vkBeginCommandBuffer(cmd_buffer, &cmd_buf_info);
             if (VK_SUCCESS != vk_result) {
-                std::string error_msg = "GravityVulkanEngine::SetupInitalGraphicsDevice failed vkBeginCommandBuffer with ";
+                std::string error_msg = "GravityEngine::SetupInitalGraphicsDevice failed vkBeginCommandBuffer with ";
                 error_msg += vk_result;
                 error_msg += " for present command buffer ";
                 error_msg += std::to_string(iii);
@@ -944,7 +1257,7 @@ bool GravityVulkanEngine::SetupInitalGraphicsDevice() {
                                  VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, NULL, 0, NULL, 1, &image_ownership_barrier);
             vk_result = vkEndCommandBuffer(cmd_buffer);
             if (VK_SUCCESS != vk_result) {
-                std::string error_msg = "GravityVulkanEngine::SetupInitalGraphicsDevice failed vkEndCommandBuffer with ";
+                std::string error_msg = "GravityEngine::SetupInitalGraphicsDevice failed vkEndCommandBuffer with ";
                 error_msg += vk_result;
                 error_msg += " for present command buffer";
                 logger.LogError(error_msg);
@@ -960,7 +1273,7 @@ bool GravityVulkanEngine::SetupInitalGraphicsDevice() {
     return true;
 }
 
-bool GravityVulkanEngine::SetupSwapchain(GravityLogger &logger) {
+bool GravityEngine::SetupSwapchain(GravityLogger &logger) {
     uint32_t count = 0;
     std::vector<VkSurfaceFormatKHR> surface_formats;
     VkSurfaceCapabilitiesKHR surface_caps = {};
@@ -969,10 +1282,10 @@ bool GravityVulkanEngine::SetupSwapchain(GravityLogger &logger) {
     VkResult vk_result = VK_SUCCESS;
 
     // Get the list of VkFormat's that are supported:
-    vk_result = m_vk_inst_dispatch_table.GetPhysicalDeviceSurfaceFormatsKHR(m_vk_phys_dev, m_window->GetSurface(), &count, nullptr);
+    vk_result = m_inst_ext_if->GetPhysicalDeviceSurfaceFormatsKHR(m_vk_phys_dev, m_window->GetSurface(), &count, nullptr);
     if (VK_SUCCESS != vk_result || count == 0) {
         std::string error_msg =
-            "GravityVulkanEngine::SetupSwapchain failed to query "
+            "GravityEngine::SetupSwapchain failed to query "
             "GetPhysicalDeviceSurfaceFormatsKHR with count ";
         error_msg += std::to_string(count);
         error_msg += " error ";
@@ -982,11 +1295,11 @@ bool GravityVulkanEngine::SetupSwapchain(GravityLogger &logger) {
     }
 
     surface_formats.resize(count);
-    vk_result = m_vk_inst_dispatch_table.GetPhysicalDeviceSurfaceFormatsKHR(m_vk_phys_dev, m_window->GetSurface(), &count,
-                                                                            surface_formats.data());
+    vk_result =
+        m_inst_ext_if->GetPhysicalDeviceSurfaceFormatsKHR(m_vk_phys_dev, m_window->GetSurface(), &count, surface_formats.data());
     if (VK_SUCCESS != vk_result || count == 0) {
         std::string error_msg =
-            "GravityVulkanEngine::SetupSwapchain failed to query "
+            "GravityEngine::SetupSwapchain failed to query "
             "GetPhysicalDeviceSurfaceFormatsKHR 2nd time with count ";
         error_msg += std::to_string(count);
         error_msg += " error ";
@@ -1052,7 +1365,7 @@ bool GravityVulkanEngine::SetupSwapchain(GravityLogger &logger) {
     for (uint32_t i = 0; i < m_num_backbuffers; i++) {
         vk_result = vkCreateFence(m_vk_device, &fence_create_info, nullptr, &m_swapchain_surface.fences[i]);
         if (VK_SUCCESS != vk_result) {
-            std::string error_msg = "GravityVulkanEngine::SetupSwapchain failed vkCreateFence for buffer ";
+            std::string error_msg = "GravityEngine::SetupSwapchain failed vkCreateFence for buffer ";
             error_msg += std::to_string(i);
             logger.LogError(error_msg);
             return false;
@@ -1061,7 +1374,7 @@ bool GravityVulkanEngine::SetupSwapchain(GravityLogger &logger) {
         vk_result =
             vkCreateSemaphore(m_vk_device, &semaphore_create_info, nullptr, &m_swapchain_surface.image_acquired_semaphores[i]);
         if (VK_SUCCESS != vk_result) {
-            std::string error_msg = "GravityVulkanEngine::SetupSwapchain failed vkCreateSemaphore for buffer ";
+            std::string error_msg = "GravityEngine::SetupSwapchain failed vkCreateSemaphore for buffer ";
             error_msg += std::to_string(i);
             error_msg += " image acquire semaphore";
             logger.LogError(error_msg);
@@ -1071,7 +1384,7 @@ bool GravityVulkanEngine::SetupSwapchain(GravityLogger &logger) {
         vk_result =
             vkCreateSemaphore(m_vk_device, &semaphore_create_info, nullptr, &m_swapchain_surface.draw_complete_semaphores[i]);
         if (VK_SUCCESS != vk_result) {
-            std::string error_msg = "GravityVulkanEngine::SetupSwapchain failed vkCreateSemaphore for buffer ";
+            std::string error_msg = "GravityEngine::SetupSwapchain failed vkCreateSemaphore for buffer ";
             error_msg += std::to_string(i);
             error_msg += " draw complete semaphore";
             logger.LogError(error_msg);
@@ -1082,7 +1395,7 @@ bool GravityVulkanEngine::SetupSwapchain(GravityLogger &logger) {
             vk_result =
                 vkCreateSemaphore(m_vk_device, &semaphore_create_info, nullptr, &m_swapchain_surface.image_ownership_semaphores[i]);
             if (VK_SUCCESS != vk_result) {
-                std::string error_msg = "GravityVulkanEngine::SetupSwapchain failed vkCreateSemaphore for buffer ";
+                std::string error_msg = "GravityEngine::SetupSwapchain failed vkCreateSemaphore for buffer ";
                 error_msg += std::to_string(i);
                 error_msg += " separate present queue image ownership semaphore";
                 logger.LogError(error_msg);
@@ -1092,16 +1405,15 @@ bool GravityVulkanEngine::SetupSwapchain(GravityLogger &logger) {
     }
 
     // Check the surface capabilities and formats
-    vk_result =
-        m_vk_inst_dispatch_table.GetPhysicalDeviceSurfaceCapabilitiesKHR(m_vk_phys_dev, m_window->GetSurface(), &surface_caps);
+    vk_result = m_inst_ext_if->GetPhysicalDeviceSurfaceCapabilitiesKHR(m_vk_phys_dev, m_window->GetSurface(), &surface_caps);
     if (VK_SUCCESS != vk_result) {
         logger.LogError(
-            "GravityVulkanEngine::SetupSwapchain failed call to "
+            "GravityEngine::SetupSwapchain failed call to "
             "vkGetPhysicalDeviceSurfaceCapabilitiesKHR");
         return false;
     } else if (m_num_backbuffers < surface_caps.minImageCount ||
                (surface_caps.maxImageCount > 0 && m_num_backbuffers > surface_caps.maxImageCount)) {
-        std::string error_msg = "GravityVulkanEngine::SetupSwapchain surface can't support ";
+        std::string error_msg = "GravityEngine::SetupSwapchain surface can't support ";
         error_msg += std::to_string(m_num_backbuffers);
         if (surface_caps.maxImageCount > 0) {
             error_msg += " backbuffers, number should be between ";
@@ -1116,20 +1428,19 @@ bool GravityVulkanEngine::SetupSwapchain(GravityLogger &logger) {
         return false;
     }
 
-    vk_result =
-        m_vk_inst_dispatch_table.GetPhysicalDeviceSurfacePresentModesKHR(m_vk_phys_dev, m_window->GetSurface(), &count, NULL);
+    vk_result = m_inst_ext_if->GetPhysicalDeviceSurfacePresentModesKHR(m_vk_phys_dev, m_window->GetSurface(), &count, NULL);
     if (VK_SUCCESS != vk_result) {
         logger.LogError(
-            "GravityVulkanEngine::SetupSwapchain failed call to "
+            "GravityEngine::SetupSwapchain failed call to "
             "GetPhysicalDeviceSurfacePresentModesKHR for count");
         return false;
     }
     present_modes.resize(count);
-    vk_result = m_vk_inst_dispatch_table.GetPhysicalDeviceSurfacePresentModesKHR(m_vk_phys_dev, m_window->GetSurface(), &count,
-                                                                                 present_modes.data());
+    vk_result =
+        m_inst_ext_if->GetPhysicalDeviceSurfacePresentModesKHR(m_vk_phys_dev, m_window->GetSurface(), &count, present_modes.data());
     if (VK_SUCCESS != vk_result) {
         logger.LogError(
-            "GravityVulkanEngine::SetupSwapchain failed call to "
+            "GravityEngine::SetupSwapchain failed call to "
             "GetPhysicalDeviceSurfacePresentModesKHR for data");
         return false;
     }
@@ -1157,7 +1468,7 @@ bool GravityVulkanEngine::SetupSwapchain(GravityLogger &logger) {
     } else if (surface_caps.currentExtent.width < m_window->GetWidth() ||
                surface_caps.currentExtent.height < m_window->GetHeight()) {
         logger.LogError(
-            "GravityVulkanEngine::SetupSwapchain surface doesn't support"
+            "GravityEngine::SetupSwapchain surface doesn't support"
             " swapchains of the requested size");
         return false;
     }
@@ -1174,7 +1485,7 @@ bool GravityVulkanEngine::SetupSwapchain(GravityLogger &logger) {
         }
         if (!found_pm) {
             if (desired_present_mode == VK_PRESENT_MODE_IMMEDIATE_KHR) {
-                logger.LogError("GravityVulkanEngine::SetupSwapchain surface failed to find present mode");
+                logger.LogError("GravityEngine::SetupSwapchain surface failed to find present mode");
                 return false;
             }
             desired_present_mode = static_cast<VkPresentModeKHR>(static_cast<int32_t>(desired_present_mode) - 1);
@@ -1222,7 +1533,7 @@ bool GravityVulkanEngine::SetupSwapchain(GravityLogger &logger) {
 
     vk_result = vkCreateSwapchainKHR(m_vk_device, &swapchain_create_info, nullptr, &m_swapchain_surface.vk_swapchain);
     if (VK_SUCCESS != vk_result) {
-        logger.LogError("GravityVulkanEngine::SetupSwapchain failed call to CreateSwapchainKHR");
+        logger.LogError("GravityEngine::SetupSwapchain failed call to CreateSwapchainKHR");
         return false;
     }
 
@@ -1230,7 +1541,7 @@ bool GravityVulkanEngine::SetupSwapchain(GravityLogger &logger) {
     vk_result = vkGetSwapchainImagesKHR(m_vk_device, m_swapchain_surface.vk_swapchain, &count, nullptr);
     if (VK_SUCCESS != vk_result || count == 0) {
         logger.LogError(
-            "GravityVulkanEngine::SetupSwapchain failed call to GetSwapchainImagesKHR "
+            "GravityEngine::SetupSwapchain failed call to GetSwapchainImagesKHR "
             "querying number of swapchain images");
         return false;
     }
@@ -1239,7 +1550,7 @@ bool GravityVulkanEngine::SetupSwapchain(GravityLogger &logger) {
     vk_result = vkGetSwapchainImagesKHR(m_vk_device, m_swapchain_surface.vk_swapchain, &count, swpchn_images.data());
     if (VK_SUCCESS != vk_result || count == 0) {
         logger.LogError(
-            "GravityVulkanEngine::SetupSwapchain failed call to GetSwapchainImagesKHR "
+            "GravityEngine::SetupSwapchain failed call to GetSwapchainImagesKHR "
             "querying of swapchain images");
         return false;
     }
@@ -1272,7 +1583,7 @@ bool GravityVulkanEngine::SetupSwapchain(GravityLogger &logger) {
         vk_result =
             vkCreateImageView(m_vk_device, &image_view_create_info, nullptr, &m_swapchain_surface.swapchain_images[i].image_view);
         if (VK_SUCCESS != vk_result) {
-            std::string message = "GravityVulkanEngine::SetupSwapchain failed ";
+            std::string message = "GravityEngine::SetupSwapchain failed ";
             message += std::to_string(i);
             message += " call to vkCreateImageView";
             logger.LogError(message);
@@ -1281,7 +1592,7 @@ bool GravityVulkanEngine::SetupSwapchain(GravityLogger &logger) {
 
         vk_result = vkCreateFence(m_vk_device, &fence_create_info, nullptr, &m_swapchain_surface.swapchain_images[i].fence);
         if (VK_SUCCESS != vk_result) {
-            std::string message = "GravityVulkanEngine::SetupSwapchain failed ";
+            std::string message = "GravityEngine::SetupSwapchain failed ";
             message += std::to_string(i);
             message += " call to vkCreateFence";
             logger.LogError(message);
@@ -1294,7 +1605,7 @@ bool GravityVulkanEngine::SetupSwapchain(GravityLogger &logger) {
     return true;
 }
 
-void GravityVulkanEngine::CleanupSwapchain() {
+void GravityEngine::CleanupSwapchain() {
     uint32_t i;
 
     for (i = 0; i < m_swapchain_surface.swapchain_images.size(); i++) {
@@ -1322,12 +1633,11 @@ void GravityVulkanEngine::CleanupSwapchain() {
     }
 }
 
-bool GravityVulkanEngine::SetupDepthStencilSurface(GravityLogger &logger) {
+bool GravityEngine::SetupDepthStencilSurface(GravityLogger &logger) {
     VkResult vk_result = VK_SUCCESS;
     VkImageCreateInfo image_create_info = {};
     VkImageViewCreateInfo image_view_create_info = {};
     VkMemoryRequirements mem_reqs = {};
-    VkMemoryAllocateInfo mem_alloc_info = {};
 
     // Create an image for the depth/stencil surface
     image_create_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -1345,7 +1655,7 @@ bool GravityVulkanEngine::SetupDepthStencilSurface(GravityLogger &logger) {
     vk_result = vkCreateImage(m_vk_device, &image_create_info, nullptr, &m_depth_stencil_surface.image);
     if (VK_SUCCESS != vk_result) {
         std::string error_msg =
-            "GravityVulkanEngine::SetupDepthStencilSurface failed to create image "
+            "GravityEngine::SetupDepthStencilSurface failed to create image "
             "with error ";
         error_msg += vk_result;
         logger.LogError(error_msg);
@@ -1354,37 +1664,8 @@ bool GravityVulkanEngine::SetupDepthStencilSurface(GravityLogger &logger) {
 
     // See how much memory we require for the depth/stencil surface
     vkGetImageMemoryRequirements(m_vk_device, m_depth_stencil_surface.image, &mem_reqs);
-    mem_alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-    mem_alloc_info.pNext = NULL;
-    mem_alloc_info.allocationSize = mem_reqs.size;
-    mem_alloc_info.memoryTypeIndex = 0;
-
-    bool found_mem_type = false;
-    for (uint32_t mem_type = 0; mem_type < VK_MAX_MEMORY_TYPES; mem_type++) {
-        if (mem_reqs.memoryTypeBits & 0x1) {
-            if ((m_vk_dev_mem_props.memoryTypes[mem_type].propertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)) {
-                mem_alloc_info.memoryTypeIndex = mem_type;
-                found_mem_type = true;
-                break;
-            }
-        }
-        mem_reqs.memoryTypeBits >>= 1;
-    }
-    if (!found_mem_type) {
-        logger.LogError(
-            "GravityVulkanEngine::SetupDepthStencilSurface failed to find device local memory"
-            " type for depth stencil surface");
-        return false;
-    }
-
-    // Allocate memory for the depth/stencil buffer
-    vk_result = vkAllocateMemory(m_vk_device, &mem_alloc_info, nullptr, &m_depth_stencil_surface.dev_memory);
-    if (VK_SUCCESS != vk_result) {
-        std::string error_msg =
-            "GravityVulkanEngine::SetupDepthStencilSurface failed to allocate image memory "
-            "with error ";
-        error_msg += vk_result;
-        logger.LogError(error_msg);
+    if (!m_dev_memory->AllocateMemory(mem_reqs, m_depth_stencil_surface.dev_memory)) {
+        logger.LogError("GravityEngine::SetupDepthStencilSurface failed GravityDeviceMemory->AllocateMemory call");
         return false;
     }
 
@@ -1392,7 +1673,7 @@ bool GravityVulkanEngine::SetupDepthStencilSurface(GravityLogger &logger) {
     vk_result = vkBindImageMemory(m_vk_device, m_depth_stencil_surface.image, m_depth_stencil_surface.dev_memory, 0);
     if (VK_SUCCESS != vk_result) {
         std::string error_msg =
-            "GravityVulkanEngine::SetupDepthStencilSurface failed to bind image memory "
+            "GravityEngine::SetupDepthStencilSurface failed to bind image memory "
             "with error ";
         error_msg += vk_result;
         logger.LogError(error_msg);
@@ -1414,7 +1695,7 @@ bool GravityVulkanEngine::SetupDepthStencilSurface(GravityLogger &logger) {
     vk_result = vkCreateImageView(m_vk_device, &image_view_create_info, NULL, &m_depth_stencil_surface.image_view);
     if (VK_SUCCESS != vk_result) {
         std::string error_msg =
-            "GravityVulkanEngine::SetupDepthStencilSurface failed to create image view "
+            "GravityEngine::SetupDepthStencilSurface failed to create image view "
             "with error ";
         error_msg += vk_result;
         logger.LogError(error_msg);
@@ -1424,7 +1705,7 @@ bool GravityVulkanEngine::SetupDepthStencilSurface(GravityLogger &logger) {
     return true;
 }
 
-void GravityVulkanEngine::CleanupDepthStencilSurface() {
+void GravityEngine::CleanupDepthStencilSurface() {
     if (VK_NULL_HANDLE != m_depth_stencil_surface.image_view) {
         vkDestroyImageView(m_vk_device, m_depth_stencil_surface.image_view, nullptr);
     }
@@ -1436,9 +1717,47 @@ void GravityVulkanEngine::CleanupDepthStencilSurface() {
     }
 }
 
-bool GravityVulkanEngine::BeginDrawFrame() { return true; }
+void GravityEngine::Loop(void) {
+    GravityLogger &logger = GravityLogger::getInstance();
+    float last_update_computer_time_diff = 0.0f;
+    float last_update_game_time_diff = 0.0f;
 
-bool GravityVulkanEngine::EndDrawFrame() {
+    // If we hit the loop, we no longer need the settings file if we found one
+    if (nullptr != m_settings) {
+        delete m_settings;
+        m_settings = nullptr;
+    }
+
+    m_clock->Start();
+    logger.LogInfo("GravityEngine::Loop starting engine loop");
+    while (!m_quit) {
+        float computer_time_diff = 0.0f;
+        float game_time_diff = 0.0f;
+        m_clock->GetTimeDiffMS(computer_time_diff, game_time_diff);
+        last_update_computer_time_diff += computer_time_diff;
+        last_update_game_time_diff += game_time_diff;
+        ProcessEvents();
+        Update(last_update_computer_time_diff, last_update_game_time_diff);
+        if (!m_paused) {
+            if (BeginDrawFrame()) {
+                Draw();
+                EndDrawFrame();
+                m_cur_frame++;
+            }
+        }
+        last_update_computer_time_diff = 0;
+        last_update_game_time_diff = 0;
+    }
+    logger.LogInfo("GravityEngine::Loop engine loop finished");
+}
+
+bool GravityEngine::Update(float comp_time, float game_time) { return true; }
+
+bool GravityEngine::BeginDrawFrame() { return true; }
+
+bool GravityEngine::Draw() { return true; }
+
+bool GravityEngine::EndDrawFrame() {
     GravityLogger &logger = GravityLogger::getInstance();
     VkResult vk_result;
     uint32_t cur_frame = m_swapchain_surface.frame_index;
@@ -1462,10 +1781,8 @@ bool GravityVulkanEngine::EndDrawFrame() {
                 .image = m_swapchain_surface.swapchain_images[m_swapchain_surface.cur_framebuffer].image,
                 .subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1}};
 
-            vkCmdPipelineBarrier(m_graphics_cmd_buffer.vk_cmd_buf,
-                                 VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                                 VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0,
-                                 0, NULL, 0, NULL, 1, &image_ownership_barrier);
+            vkCmdPipelineBarrier(m_graphics_cmd_buffer.vk_cmd_buf, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                                 VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0, NULL, 0, NULL, 1, &image_ownership_barrier);
         }
 
         vkEndCommandBuffer(m_graphics_cmd_buffer.vk_cmd_buf);
@@ -1476,11 +1793,11 @@ bool GravityVulkanEngine::EndDrawFrame() {
     vkResetFences(m_vk_device, 1, &m_swapchain_surface.fences[cur_frame]);
 
     // Get the index of the next available swapchain image:
-    vk_result = m_vk_dev_dispatch_table.AcquireNextImageKHR(m_vk_device, m_swapchain_surface.vk_swapchain, UINT64_MAX,
-                                                            m_swapchain_surface.image_acquired_semaphores[cur_frame],
-                                                            VK_NULL_HANDLE, &m_swapchain_surface.cur_framebuffer);
+    vk_result = m_dev_ext_if->AcquireNextImageKHR(m_vk_device, m_swapchain_surface.vk_swapchain, UINT64_MAX,
+                                                  m_swapchain_surface.image_acquired_semaphores[cur_frame], VK_NULL_HANDLE,
+                                                  &m_swapchain_surface.cur_framebuffer);
     if (VK_SUCCESS != vk_result) {
-        std::string error_msg = "GravityVulkanEngine::EndDrawFrame failed m_vk_inst_dispatch_table.AcquireNextImageKHR with error ";
+        std::string error_msg = "GravityEngine::EndDrawFrame failed AcquireNextImageKHR with error ";
         error_msg += vk_result;
         logger.LogError(error_msg);
         return false;
@@ -1504,7 +1821,7 @@ bool GravityVulkanEngine::EndDrawFrame() {
     submit_info.pSignalSemaphores = &m_swapchain_surface.draw_complete_semaphores[cur_frame];
     vk_result = vkQueueSubmit(m_graphics_queue.vk_queue, 1, &submit_info, m_swapchain_surface.fences[cur_frame]);
     if (VK_SUCCESS != vk_result) {
-        std::string error_msg = "GravityVulkanEngine::EndDrawFrame failed vkQueueSubmit with error ";
+        std::string error_msg = "GravityEngine::EndDrawFrame failed vkQueueSubmit with error ";
         error_msg += vk_result;
         logger.LogError(error_msg);
         return false;
@@ -1532,15 +1849,15 @@ bool GravityVulkanEngine::EndDrawFrame() {
         submit_info.pSignalSemaphores = &m_swapchain_surface.image_ownership_semaphores[cur_frame];
         vk_result = vkQueueSubmit(m_present_queue.vk_queue, 1, &submit_info, nullFence);
         if (VK_SUCCESS != vk_result) {
-            std::string error_msg = "GravityVulkanEngine::EndDrawFrame failed present vkQueueSubmit with error ";
+            std::string error_msg = "GravityEngine::EndDrawFrame failed present vkQueueSubmit with error ";
             error_msg += vk_result;
             logger.LogError(error_msg);
             return false;
         }
-        vk_result = m_vk_dev_dispatch_table.QueuePresentKHR(m_present_queue.vk_queue, &present);
+        vk_result = m_dev_ext_if->QueuePresentKHR(m_present_queue.vk_queue, &present);
     } else {
         present.pWaitSemaphores = &m_swapchain_surface.draw_complete_semaphores[cur_frame];
-        vk_result = m_vk_dev_dispatch_table.QueuePresentKHR(m_graphics_queue.vk_queue, &present);
+        vk_result = m_dev_ext_if->QueuePresentKHR(m_graphics_queue.vk_queue, &present);
     }
     if (VK_ERROR_OUT_OF_DATE_KHR == vk_result) {
 #if 0  // TODO : Brainpain
@@ -1552,7 +1869,7 @@ bool GravityVulkanEngine::EndDrawFrame() {
         // demo->swapchain is not as optimal as it could be, but the platform's
         // presentation engine will still present the image correctly.
     } else if (VK_SUCCESS != vk_result) {
-        std::string error_msg = "GravityVulkanEngine::EndDrawFrame failed present QueuePresentKHR with error ";
+        std::string error_msg = "GravityEngine::EndDrawFrame failed present QueuePresentKHR with error ";
         error_msg += vk_result;
         logger.LogError(error_msg);
         return false;

@@ -21,7 +21,7 @@
 #include <string>
 #include <vector>
 
-#include "gravityvulkandemo.hpp"
+#include "gravitydemo.hpp"
 
 int main(int argc, char *argv[]) {
     std::vector<std::string> arguments;
@@ -30,7 +30,7 @@ int main(int argc, char *argv[]) {
         arguments[iii] = argv[iii];
     }
 
-    GravityVulkanDemo demo;
+    GravityDemo demo;
     if (!demo.Init(arguments)) {
         return -1;
     }

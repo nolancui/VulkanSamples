@@ -26,15 +26,15 @@
 #include "gravitylogger.hpp"
 #include "gravitysettingreader.hpp"
 #include "gravitywindow.hpp"
-#include "gravitygfxengine.hpp"
-
+#include "gravityengine.hpp"
 
 #ifdef VK_USE_PLATFORM_WIN32_KHR
 #pragma warning(push)
-#pragma warning(disable: 4996) // Disable warning on using strncpy for portability
-#endif // VK_USE_PLATFORM_WIN32_KHR
+#pragma warning(disable : 4996)  // Disable warning on using strncpy for portability
+#endif                           // VK_USE_PLATFORM_WIN32_KHR
 
-GravityWindow::GravityWindow(std::string &win_name, GravitySettingGroup *settings, std::vector<std::string> &arguments, GravityClock *clock) {
+GravityWindow::GravityWindow(std::string &win_name, GravitySettingGroup *settings, std::vector<std::string> &arguments,
+                             GravityClock *clock) {
     GravityLogger &logger = GravityLogger::getInstance();
 
     m_width = 500;
@@ -64,9 +64,7 @@ GravityWindow::GravityWindow(std::string &win_name, GravitySettingGroup *setting
     }
 }
 
-GravityWindow::~GravityWindow() {
-    CloseGfxWindow();
-}
+GravityWindow::~GravityWindow() { CloseGfxWindow(); }
 
 bool GravityWindow::InitWithSettings(GravityLogger &logger, GravitySettingGroup *settings, std::vector<std::string> &arguments) {
     bool print_usage = false;
@@ -108,4 +106,4 @@ void GravityWindow::AppendUsageString(std::string &usage) {
 
 #ifdef VK_USE_PLATFORM_WIN32_KHR
 #pragma warning(pop)
-#endif // VK_USE_PLATFORM_WIN32_KHR
+#endif  // VK_USE_PLATFORM_WIN32_KHR

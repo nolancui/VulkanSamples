@@ -1,5 +1,5 @@
 /*
- * LunarGravity - gravityvulkandemo.cpp
+ * LunarGravity - gravitydemo.cpp
  *
  * Copyright (C) 2017 LunarG, Inc.
  *
@@ -28,22 +28,23 @@
 
 #include "gravitylogger.hpp"
 #include "gravitysettingreader.hpp"
-#include "gravityvulkandemo.hpp"
+#include "gravityscene.hpp"
 #include "gravitywindow.hpp"
 #include "gravityclock.hpp"
 #include "gravityevent.hpp"
+#include "gravitydemo.hpp"
 
-GravityVulkanDemo::GravityVulkanDemo() : GravityVulkanEngine() {
+GravityDemo::GravityDemo() : GravityEngine() {
 }
 
-GravityVulkanDemo::~GravityVulkanDemo() {
+GravityDemo::~GravityDemo() {
 }
 
-void GravityVulkanDemo::AppendUsageString(std::string &usage) {
-    GravityVulkanEngine::AppendUsageString(usage);
+void GravityDemo::AppendUsageString(std::string &usage) {
+    GravityEngine::AppendUsageString(usage);
 }
 
-bool GravityVulkanDemo::ProcessEvents(void) {
+bool GravityDemo::ProcessEvents(void) {
     GravityLogger &logger = GravityLogger::getInstance();
     GravityEventList &event_list = GravityEventList::getInstance();
     bool success = true;
@@ -95,39 +96,35 @@ bool GravityVulkanDemo::ProcessEvents(void) {
     return success;
 }
 
-bool GravityVulkanDemo::Init(std::vector<std::string> &arguments) {
+bool GravityDemo::Init(std::vector<std::string> &arguments) {
     // Call the parent and do all the necessary setup
-    if (!GravityVulkanEngine::Init(arguments)) {
+    if (!GravityEngine::Init(arguments)) {
+        return false;
+    }
+    
+    // Load the initial scene here
+    return m_cur_scene->Start();
+}
+
+bool GravityDemo::Update(float comp_time, float game_time) {
+    return m_cur_scene->Update(comp_time, game_time);
+}
+
+bool GravityDemo::BeginDrawFrame() {
+    if (!GravityEngine::BeginDrawFrame()) {
         return false;
     }
 
-    // TODO: Demo specific Init code
-
-    return true;
-}
-
-bool GravityVulkanDemo::Update() {
-    // TODO: Demo specific Update code
-
-    return true;
-}
-
-bool GravityVulkanDemo::BeginDrawFrame() {
-    bool success = GravityVulkanEngine::BeginDrawFrame();
-
     // TODO: Demo specific BeginDrawFrame code
-
-    return success;
-}
-
-bool GravityVulkanDemo::Draw() {
-    // TODO: Demo specific Draw code
-
     return true;
 }
 
-bool GravityVulkanDemo::EndDrawFrame() {
+bool GravityDemo::Draw() {
+    return m_cur_scene->Draw();
+}
+
+bool GravityDemo::EndDrawFrame() {
     // TODO: Demo specific EndDrawFrame code
 
-    return GravityVulkanEngine::EndDrawFrame();
+    return GravityEngine::EndDrawFrame();
 }

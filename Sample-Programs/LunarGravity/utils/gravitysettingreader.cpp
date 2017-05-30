@@ -65,7 +65,7 @@ out:
 }
 
 bool GravitySettingReader::ReadFile(GravityLogger &logger, const char *json_filename, GravitySettingGroup *settings_group) {
-    std::ifstream *stream = NULL;
+    std::ifstream *stream = nullptr;
     bool success = false;
     Json::Reader reader;
     Json::Value root = Json::nullValue;
@@ -118,7 +118,7 @@ out:
     if (nullptr != stream) {
         stream->close();
         delete stream;
-        stream = NULL;
+        stream = nullptr;
     }
 
     return success;

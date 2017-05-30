@@ -1,5 +1,5 @@
 /*
- * LunarGravity - gravityvulkanengine.hpp
+ * LunarGravity - gravityengine.hpp
  *
  * Copyright (C) 2017 LunarG, Inc.
  *
@@ -20,13 +20,29 @@
 
 #pragma once
 
+#include <vector>
+#include <string>
 #include <vulkan/vulkan.h>
-#include <vulkan/vk_layer.h>
 
-#include "gravitygfxengine.hpp"
 #include "gravitylogger.hpp"
+#include "gravityinstanceextif.hpp"
+#include "gravitydeviceextif.hpp"
 
 struct VulkanString;
+class GravityClock;
+class GravityWindow;
+struct GravitySettingGroup;
+class GravityDeviceMemory;
+class GravityScene;
+
+enum GravitySystemBatteryStatus {
+    GRAVITY_BATTERY_STATUS_NONE = 0,
+    GRAVITY_BATTERY_STATUS_DISCHARGING_HIGH,      // > 66%
+    GRAVITY_BATTERY_STATUS_DISCHARGING_MID,       // > 33%
+    GRAVITY_BATTERY_STATUS_DISCHARGING_LOW,       // < 33%
+    GRAVITY_BATTERY_STATUS_DISCHARGING_CRITICAL,  // < 5%
+    GRAVITY_BATTERY_STATUS_CHARGING,
+};
 
 #define MAX_NUM_BACK_BUFFERS 4
 
@@ -69,26 +85,33 @@ struct GravityDepthStencilSurface {
     VkImageView image_view;
 };
 
-class GravityVulkanEngine : public GravityGraphicsEngine {
+class GravityEngine {
    public:
     // Create a protected constructor
-    GravityVulkanEngine();
+    GravityEngine();
 
     // We don't want any copy constructors
-    GravityVulkanEngine(const GravityVulkanEngine &gfx_engine) = delete;
-    GravityVulkanEngine &operator=(const GravityVulkanEngine &gfx_engine) = delete;
+    GravityEngine(const GravityEngine &gfx_engine) = delete;
+    GravityEngine &operator=(const GravityEngine &gfx_engine) = delete;
 
     // Make the destructor public
-    virtual ~GravityVulkanEngine();
+    virtual ~GravityEngine();
 
     virtual bool Init(std::vector<std::string> &arguments);
     virtual void AppendUsageString(std::string &usage);
+    virtual void PrintUsage(std::string &usage);
 
     virtual bool SetupInitalGraphicsDevice();
+
+    virtual bool ProcessEvents() = 0;
+    void Loop();
+    virtual bool Update(float comp_time, float game_time);
     virtual bool BeginDrawFrame();
+    virtual bool Draw();
     virtual bool EndDrawFrame();
 
    protected:
+    GravitySystemBatteryStatus SystemBatteryStatus(void);
     bool QueryWindowSystem(std::vector<VkExtensionProperties> &ext_props, uint32_t &ext_count, const char **desired_extensions);
     int CompareGpus(VkPhysicalDeviceProperties &gpu_0, VkPhysicalDeviceProperties &gpu_1);
 
@@ -98,10 +121,37 @@ class GravityVulkanEngine : public GravityGraphicsEngine {
     bool SetupDepthStencilSurface(GravityLogger &logger);
     void CleanupDepthStencilSurface();
 
+    bool m_print_usage;
+    bool m_debug_enabled;
+    bool m_quit;
+    bool m_paused;
+    std::string m_app_name;
+    int64_t m_app_version;
+    std::string m_engine_name;
+    int64_t m_engine_version;
+    uint64_t m_cur_frame;
+
+    // Settings
+    GravitySettingGroup *m_settings;
+
+    // Graphics device items
+    uint32_t m_num_phys_devs;
+    uint32_t m_num_backbuffers;
+
+    // Clock
+    GravityClock *m_clock;
+
+    // Window
+    GravityWindow *m_window;
+
+    // Scenes
+    GravityScene *m_cur_scene;
+    GravityScene *m_next_scene;
+
     // Vulkan Instance items
     VkInstance m_vk_inst;
     bool m_validation_enabled;
-    VkLayerInstanceDispatchTable m_vk_inst_dispatch_table;
+    GravityInstanceExtIf *m_inst_ext_if;
     VkDebugReportCallbackEXT m_dbg_report_callback;
 
     // Swapchain surface info
@@ -115,11 +165,11 @@ class GravityVulkanEngine : public GravityGraphicsEngine {
     bool m_separate_present_queue;
     GravityQueue m_graphics_queue;
     GravityQueue m_present_queue;
+    GravityDeviceMemory *m_dev_memory;
 
     // Vulkan Logical Device items
     VkDevice m_vk_device;
-    VkLayerDispatchTable m_vk_dev_dispatch_table;
-    VkPhysicalDeviceMemoryProperties m_vk_dev_mem_props;
+    GravityDeviceExtIf *m_dev_ext_if;
 
     // Command buffer information
     VkCommandPool m_vk_graphics_cmd_pool;

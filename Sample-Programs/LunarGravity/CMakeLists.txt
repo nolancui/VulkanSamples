@@ -58,10 +58,10 @@ else()
 endif()
 
 file(GLOB RESOURCES
-  "${PROJECT_SOURCE_DIR}/Sample-Programs/LunarGravity/resources"
+  "${PROJECT_SOURCE_DIR}/Sample-Programs/LunarGravity/resources/*"
 )
 
-file(COPY ${RESOURCES} DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+file(COPY ${RESOURCES} DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/resources)
 
 set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS}")
 set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
@@ -119,7 +119,6 @@ endif()
 add_executable(LunarGravity
                 ${CMAKE_CURRENT_BINARY_DIR}/resources/shaders/simple_single_tex-vs.spv
                 ${CMAKE_CURRENT_BINARY_DIR}/resources/shaders/simple_single_tex-fs.spv
-                ${CMAKE_CURRENT_BINARY_DIR}/resources/gravity.json
                 ${JSONCPP_SOURCE_DIR}/jsoncpp.cpp
                 utils/gravitylogger.cpp
                 utils/gravitylogger.hpp
@@ -128,12 +127,22 @@ add_executable(LunarGravity
                 utils/gravityevent.cpp
                 utils/gravityevent.hpp
                 utils/gravityclock.hpp
+                utils/gravitydeviceextif.cpp
+                utils/gravitydeviceextif.hpp
+                utils/gravityinstanceextif.cpp
+                utils/gravityinstanceextif.hpp
                 ${GRAVITY_OS_SOURCES}
-                engine/gravitygfxengine.cpp
-                engine/gravitygfxengine.hpp
-                engine/gravityvulkanengine.cpp
-                engine/gravityvulkanengine.hpp
-                gravityvulkandemo.cpp
-                gravityvulkandemo.hpp
+                engine/gravitydevicememory.cpp
+                engine/gravitydevicememory.hpp
+                engine/gravitytexture.cpp
+                engine/gravitytexture.hpp
+                engine/gravityscene.cpp
+                engine/gravityscene.hpp
+                engine/gravityscenesplash.cpp
+                engine/gravityscenesplash.hpp
+                engine/gravityengine.cpp
+                engine/gravityengine.hpp
+                gravitydemo.cpp
+                gravitydemo.hpp
                 main.cpp)
 target_link_libraries(LunarGravity ${LIBRARIES})
