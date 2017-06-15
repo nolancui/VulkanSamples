@@ -27,12 +27,14 @@
 #include "gravitylogger.hpp"
 #include "gravityinstanceextif.hpp"
 #include "gravitydeviceextif.hpp"
+#include "gravitydevicememory.hpp"
 
 struct VulkanString;
 class GravityClock;
 class GravityWindow;
 struct GravitySettingGroup;
-class GravityDeviceMemory;
+struct GravityDeviceMemory;
+class GravityDeviceMemoryManager;
 class GravityScene;
 
 enum GravitySystemBatteryStatus {
@@ -58,31 +60,31 @@ struct GravityCmdBuffer {
 };
 
 struct GraivtySwapchainImage {
-    VkImage image;
-    VkImageView image_view;
-    VkFence fence;
+    VkImage vk_image;
+    VkImageView vk_image_view;
+    VkFence vk_fence;
     VkCommandBuffer vk_present_cmd_buf;
 };
 
 struct GravitySwapchainSurface {
-    VkFormat format;
-    VkColorSpaceKHR color_space;
+    VkFormat vk_format;
+    VkColorSpaceKHR vk_color_space;
     uint32_t frame_index;
     uint32_t cur_framebuffer;
-    VkPresentModeKHR present_mode;
-    VkSemaphore image_acquired_semaphores[MAX_NUM_BACK_BUFFERS];
-    VkSemaphore draw_complete_semaphores[MAX_NUM_BACK_BUFFERS];
-    VkSemaphore image_ownership_semaphores[MAX_NUM_BACK_BUFFERS];
-    VkFence fences[MAX_NUM_BACK_BUFFERS];
+    VkPresentModeKHR vk_present_mode;
+    VkSemaphore vk_image_acquired_semaphores[MAX_NUM_BACK_BUFFERS];
+    VkSemaphore vk_draw_complete_semaphores[MAX_NUM_BACK_BUFFERS];
+    VkSemaphore vk_image_ownership_semaphores[MAX_NUM_BACK_BUFFERS];
+    VkFence vk_fences[MAX_NUM_BACK_BUFFERS];
     VkSwapchainKHR vk_swapchain;
     std::vector<GraivtySwapchainImage> swapchain_images;
 };
 
 struct GravityDepthStencilSurface {
-    VkFormat format;
-    VkImage image;
-    VkDeviceMemory dev_memory;
-    VkImageView image_view;
+    VkFormat vk_format;
+    VkImage vk_image;
+    GravityDeviceMemory dev_memory;
+    VkImageView vk_image_view;
 };
 
 class GravityEngine {
@@ -101,8 +103,6 @@ class GravityEngine {
     virtual void AppendUsageString(std::string &usage);
     virtual void PrintUsage(std::string &usage);
 
-    virtual bool SetupInitalGraphicsDevice();
-
     virtual bool ProcessEvents() = 0;
     void Loop();
     virtual bool Update(float comp_time, float game_time);
@@ -115,6 +115,7 @@ class GravityEngine {
     bool QueryWindowSystem(std::vector<VkExtensionProperties> &ext_props, uint32_t &ext_count, const char **desired_extensions);
     int CompareGpus(VkPhysicalDeviceProperties &gpu_0, VkPhysicalDeviceProperties &gpu_1);
 
+    bool SetupInitialGraphicsDevice();
     bool SetupSwapchain(GravityLogger &logger);
     void CleanupSwapchain();
 
@@ -165,7 +166,7 @@ class GravityEngine {
     bool m_separate_present_queue;
     GravityQueue m_graphics_queue;
     GravityQueue m_present_queue;
-    GravityDeviceMemory *m_dev_memory;
+    GravityDeviceMemoryManager *m_dev_memory_mgr;
 
     // Vulkan Logical Device items
     VkDevice m_vk_device;

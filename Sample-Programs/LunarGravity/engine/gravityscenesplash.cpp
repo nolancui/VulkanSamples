@@ -18,21 +18,40 @@
  * Author: Mark Young <marky@lunarg.com>
  */
 
+#include "gravitylogger.hpp"
+#include "gravitydevicememory.hpp"
 #include "gravitytexture.hpp"
 #include "gravityscenesplash.hpp"
 
-GravitySceneSplash::GravitySceneSplash(Json::Value &root, GravityInstanceExtIf *inst_ext_if, GravityDeviceExtIf *dev_ext_if)
-    : GravityScene(root, inst_ext_if, dev_ext_if) {}
+GravitySceneSplash::GravitySceneSplash(Json::Value &root, GravityInstanceExtIf *inst_ext_if)
+    : GravityScene(root, inst_ext_if) {}
 
 GravitySceneSplash::~GravitySceneSplash() {}
 
-bool GravitySceneSplash::Start() {
-    bool success = true;
-    m_texture = new GravityTexture(m_inst_ext_if, m_dev_ext_if);
-    if (nullptr != m_texture) {
-        success = m_texture->Read("lunarg.ppm");
+bool GravitySceneSplash::Load(GravityDeviceExtIf *dev_ext_if, GravityDeviceMemoryManager *dev_memory_mgr) {
+    GravityLogger &logger = GravityLogger::getInstance();
+
+    if (!GravityScene::Load(dev_ext_if, dev_memory_mgr)) {
+        logger.LogError("GravitySceneSplash::Load - failed GravityScene::Load");
+        return false;
     }
-    return success;
+
+    m_texture = new GravityTexture(m_inst_ext_if, m_dev_ext_if, m_dev_memory_mgr);
+    if (nullptr == m_texture) {
+        logger.LogError("GravitySceneSplash::Load - failed to allocate GravityTexture");
+        return false;
+    }
+
+    if (!m_texture->Read("lunarg.ppm")) {
+        logger.LogError("GravitySceneSplash::Load - failed to read GravityTexture");
+        return false;
+    }
+
+    return true;
+}
+
+bool GravitySceneSplash::Start() {
+    return true;
 }
 
 bool GravitySceneSplash::Update(float comp_time, float game_time) {

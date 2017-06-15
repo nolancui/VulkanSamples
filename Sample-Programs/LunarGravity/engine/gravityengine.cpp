@@ -217,23 +217,15 @@ bool GravityEngine::Init(std::vector<std::string> &arguments) {
 
     m_cur_frame = 0;
 
-    if (start_scene.size() == 0) {
-        logger.LogError("Could not find start scene in settings file!");
-        goto out;
-    } else {
-        // Create the starting scene
-        m_cur_scene = GravityScene::LoadScene(start_scene, m_inst_ext_if, m_dev_ext_if);
-    }
-
-    if (m_clock == nullptr || m_window == nullptr || m_cur_scene == nullptr) {
+    if (m_clock == nullptr || m_window == nullptr) {
         goto out;
     }
 
     memset(&m_swapchain_surface, 0, sizeof(GravitySwapchainSurface));
     memset(&m_depth_stencil_surface, 0, sizeof(GravityDepthStencilSurface));
-    m_swapchain_surface.format = VK_FORMAT_B8G8R8A8_UNORM;
-    m_swapchain_surface.present_mode = VK_PRESENT_MODE_FIFO_KHR;
-    m_depth_stencil_surface.format = VK_FORMAT_D16_UNORM_S8_UINT;
+    m_swapchain_surface.vk_format = VK_FORMAT_B8G8R8A8_UNORM;
+    m_swapchain_surface.vk_present_mode = VK_PRESENT_MODE_FIFO_KHR;
+    m_depth_stencil_surface.vk_format = VK_FORMAT_D16_UNORM_S8_UINT;
     for (auto cur_group : m_settings->groups) {
         // We only want the name and version out of the application data
         if (cur_group.name == "engine") {
@@ -244,27 +236,27 @@ bool GravityEngine::Init(std::vector<std::string> &arguments) {
                             m_num_backbuffers = atoi(cur_swap_setting.value.c_str());
                         } else if (cur_swap_setting.name == "flip type") {
                             if (cur_swap_setting.value == "Fifo") {
-                                m_swapchain_surface.present_mode = VK_PRESENT_MODE_FIFO_KHR;
+                                m_swapchain_surface.vk_present_mode = VK_PRESENT_MODE_FIFO_KHR;
                             } else if (cur_swap_setting.value == "Fifo_Relaxed") {
-                                m_swapchain_surface.present_mode = VK_PRESENT_MODE_FIFO_RELAXED_KHR;
+                                m_swapchain_surface.vk_present_mode = VK_PRESENT_MODE_FIFO_RELAXED_KHR;
                             } else if (cur_swap_setting.value == "Mailbox") {
-                                m_swapchain_surface.present_mode = VK_PRESENT_MODE_MAILBOX_KHR;
+                                m_swapchain_surface.vk_present_mode = VK_PRESENT_MODE_MAILBOX_KHR;
                             } else if (cur_swap_setting.value == "Immediate") {
-                                m_swapchain_surface.present_mode = VK_PRESENT_MODE_IMMEDIATE_KHR;
+                                m_swapchain_surface.vk_present_mode = VK_PRESENT_MODE_IMMEDIATE_KHR;
                             }
                         } else if (cur_swap_setting.name == "format") {
                             if (cur_swap_setting.value == "R8G8B8A8") {
-                                m_swapchain_surface.format = VK_FORMAT_R8G8B8A8_UNORM;
+                                m_swapchain_surface.vk_format = VK_FORMAT_R8G8B8A8_UNORM;
                             } else if (cur_swap_setting.value == "R8G8B8A8_SRGB") {
-                                m_swapchain_surface.format = VK_FORMAT_R8G8B8A8_SRGB;
+                                m_swapchain_surface.vk_format = VK_FORMAT_R8G8B8A8_SRGB;
                             } else if (cur_swap_setting.value == "B8G8R8A8") {
-                                m_swapchain_surface.format = VK_FORMAT_B8G8R8A8_UNORM;
+                                m_swapchain_surface.vk_format = VK_FORMAT_B8G8R8A8_UNORM;
                             } else if (cur_swap_setting.value == "B8G8R8A8_SRGB") {
-                                m_swapchain_surface.format = VK_FORMAT_B8G8R8A8_SRGB;
+                                m_swapchain_surface.vk_format = VK_FORMAT_B8G8R8A8_SRGB;
                             } else if (cur_swap_setting.value == "R16G16B16_SFLOAT") {
-                                m_swapchain_surface.format = VK_FORMAT_R16G16B16_SFLOAT;
+                                m_swapchain_surface.vk_format = VK_FORMAT_R16G16B16_SFLOAT;
                             } else if (cur_swap_setting.value == "R16G16B16A16_SFLOAT") {
-                                m_swapchain_surface.format = VK_FORMAT_R16G16B16A16_SNORM;
+                                m_swapchain_surface.vk_format = VK_FORMAT_R16G16B16A16_SNORM;
                             }
                         }
                     }
@@ -274,17 +266,17 @@ bool GravityEngine::Init(std::vector<std::string> &arguments) {
             for (auto cur_setting : cur_group.settings) {
                 if (cur_setting.name == "depthbuffer") {
                     if (cur_setting.value == "D24_S8") {
-                        m_depth_stencil_surface.format = VK_FORMAT_D24_UNORM_S8_UINT;
+                        m_depth_stencil_surface.vk_format = VK_FORMAT_D24_UNORM_S8_UINT;
                     } else if (cur_setting.value == "D16_S8") {
-                        m_depth_stencil_surface.format = VK_FORMAT_D16_UNORM_S8_UINT;
+                        m_depth_stencil_surface.vk_format = VK_FORMAT_D16_UNORM_S8_UINT;
                     } else if (cur_setting.value == "D16") {
-                        m_depth_stencil_surface.format = VK_FORMAT_D16_UNORM;
+                        m_depth_stencil_surface.vk_format = VK_FORMAT_D16_UNORM;
                     } else if (cur_setting.value == "D32_S8") {
-                        m_depth_stencil_surface.format = VK_FORMAT_D32_SFLOAT_S8_UINT;
+                        m_depth_stencil_surface.vk_format = VK_FORMAT_D32_SFLOAT_S8_UINT;
                     } else if (cur_setting.value == "D32") {
-                        m_depth_stencil_surface.format = VK_FORMAT_D32_SFLOAT;
+                        m_depth_stencil_surface.vk_format = VK_FORMAT_D32_SFLOAT;
                     } else if (cur_setting.value == "X8_D24") {
-                        m_depth_stencil_surface.format = VK_FORMAT_X8_D24_UNORM_PACK32;
+                        m_depth_stencil_surface.vk_format = VK_FORMAT_X8_D24_UNORM_PACK32;
                     }
                 }
             }
@@ -311,8 +303,29 @@ out:
         PrintUsage(usage_string);
         return false;
     } else {
-        return SetupInitalGraphicsDevice();
+        if (start_scene.size() == 0) {
+            logger.LogError("Could not find start scene in settings file!");
+            return false;
+        } else {
+            // Create the starting scene
+            m_cur_scene = GravityScene::ReadFile(start_scene, m_inst_ext_if);
+        }
+        if (nullptr == m_cur_scene) {
+            logger.LogError("Failed to read scene!");
+            return false;
+        }
+
+        if (!SetupInitialGraphicsDevice()) {
+            logger.LogError("Failed to initialize graphics device!");
+            return false;
+        }
+        if (!m_cur_scene->Load(m_dev_ext_if, m_dev_memory_mgr)) {
+            logger.LogError("Failed to load scene!");
+            return false;
+        }
     }
+
+    return true;
 }
 
 void GravityEngine::AppendUsageString(std::string &usage) {
@@ -343,7 +356,7 @@ GravityEngine::GravityEngine() {
     m_num_backbuffers = 2;
     m_cur_scene = nullptr;
     m_next_scene = nullptr;
-    m_dev_memory = nullptr;
+    m_dev_memory_mgr = nullptr;
 
     GravityLogger &logger = GravityLogger::getInstance();
     logger.SetLogLevel(log_level);
@@ -357,9 +370,9 @@ GravityEngine::GravityEngine() {
         logger.LogWarning("GravityEngine failed to read settings file on init");
     }
     m_validation_enabled = false;
-    m_depth_stencil_surface.image_view = VK_NULL_HANDLE;
-    m_depth_stencil_surface.image = VK_NULL_HANDLE;
-    m_depth_stencil_surface.dev_memory = VK_NULL_HANDLE;
+    m_depth_stencil_surface.vk_image_view = VK_NULL_HANDLE;
+    m_depth_stencil_surface.vk_image = VK_NULL_HANDLE;
+    m_depth_stencil_surface.dev_memory.vk_device_memory = VK_NULL_HANDLE;
     m_quit = false;
 }
 
@@ -699,7 +712,7 @@ int GravityEngine::CompareGpus(VkPhysicalDeviceProperties &gpu_0, VkPhysicalDevi
     return gpu_to_use;
 }
 
-bool GravityEngine::SetupInitalGraphicsDevice() {
+bool GravityEngine::SetupInitialGraphicsDevice() {
     VkApplicationInfo vk_app_info = {};
     VkInstanceCreateInfo vk_inst_create_info = {};
     VkResult vk_result;
@@ -880,7 +893,7 @@ bool GravityEngine::SetupInitalGraphicsDevice() {
     vk_result = vkEnumeratePhysicalDevices(m_vk_inst, &m_num_phys_devs, physical_devices.data());
     if (VK_SUCCESS != vk_result || m_num_phys_devs == 0) {
         std::string error_msg =
-            "GravityEngine::SetupInitalGraphicsDevice failed to query "
+            "GravityEngine::SetupInitialGraphicsDevice failed to query "
             "vkEnumeratePhysicalDevices with count ";
         error_msg += std::to_string(m_num_phys_devs);
         error_msg += " error ";
@@ -965,17 +978,17 @@ bool GravityEngine::SetupInitalGraphicsDevice() {
         return false;
     }
 
-    m_dev_memory = new GravityDeviceMemory(m_inst_ext_if, &m_vk_phys_dev);
-    if (nullptr == m_dev_memory) {
+    m_dev_memory_mgr = new GravityDeviceMemoryManager(m_inst_ext_if, &m_vk_phys_dev);
+    if (nullptr == m_dev_memory_mgr) {
         logger.LogError(
-            "GravityEngine::GravityEngine failed creating GravityDeviceMemory");
+            "GravityEngine::GravityEngine failed creating GravityDeviceMemoryManager");
         return false;
     }
 
     vk_result = vkEnumerateDeviceExtensionProperties(m_vk_phys_dev, nullptr, &count, nullptr);
     if (VK_SUCCESS != vk_result || count == 0) {
         std::string error_msg =
-            "GravityEngine::SetupInitalGraphicsDevice failed to query "
+            "GravityEngine::SetupInitialGraphicsDevice failed to query "
             "vkEnumerateDeviceExtensionProperties first time with error ";
         error_msg += vk_result;
         error_msg += " and count ";
@@ -988,7 +1001,7 @@ bool GravityEngine::SetupInitalGraphicsDevice() {
     vk_result = vkEnumerateDeviceExtensionProperties(m_vk_phys_dev, nullptr, &count, extension_properties.data());
     if (VK_SUCCESS != vk_result || count == 0) {
         std::string error_msg =
-            "GravityEngine::SetupInitalGraphicsDevice failed to query "
+            "GravityEngine::SetupInitialGraphicsDevice failed to query "
             "vkEnumerateDeviceExtensionProperties with count ";
         error_msg += std::to_string(count);
         error_msg += " error ";
@@ -1007,7 +1020,7 @@ bool GravityEngine::SetupInitalGraphicsDevice() {
     }
 
     if (!found_swapchain) {
-        std::string error_msg = "GravityEngine::SetupInitalGraphicsDevice failed to find necessary extension ";
+        std::string error_msg = "GravityEngine::SetupInitialGraphicsDevice failed to find necessary extension ";
         error_msg += VK_KHR_SWAPCHAIN_EXTENSION_NAME;
         logger.LogError(error_msg);
         return false;
@@ -1016,7 +1029,7 @@ bool GravityEngine::SetupInitalGraphicsDevice() {
     vkGetPhysicalDeviceQueueFamilyProperties(m_vk_phys_dev, &queue_family_count, nullptr);
     if (queue_family_count == 0) {
         std::string error_msg =
-            "GravityEngine::SetupInitalGraphicsDevice failed to query "
+            "GravityEngine::SetupInitialGraphicsDevice failed to query "
             "vkGetPhysicalDeviceQueueFamilyProperties first time with count ";
         error_msg += std::to_string(queue_family_count);
         logger.LogError(error_msg);
@@ -1059,7 +1072,7 @@ bool GravityEngine::SetupInitalGraphicsDevice() {
 
     if (UINT32_MAX == m_graphics_queue.family_index || UINT32_MAX == m_present_queue.family_index) {
         std::string error_msg =
-            "GravityEngine::SetupInitalGraphicsDevice failed to find either "
+            "GravityEngine::SetupInitialGraphicsDevice failed to find either "
             "a graphics or present queue for physical device.";
         logger.LogError(error_msg);
         return false;
@@ -1099,16 +1112,16 @@ bool GravityEngine::SetupInitalGraphicsDevice() {
     vk_result = vkCreateDevice(m_vk_phys_dev, &device_create_info, nullptr, &m_vk_device);
     if (vk_result == VK_ERROR_INCOMPATIBLE_DRIVER) {
         logger.LogError(
-            "GravityEngine::SetupInitalGraphicsDevice failed vkCreateDevice could not find a "
+            "GravityEngine::SetupInitialGraphicsDevice failed vkCreateDevice could not find a "
             "compatible Vulkan ICD");
         return false;
     } else if (vk_result == VK_ERROR_EXTENSION_NOT_PRESENT) {
         logger.LogError(
-            "GravityEngine::SetupInitalGraphicsDevice failed vkCreateDevice could not find "
+            "GravityEngine::SetupInitialGraphicsDevice failed vkCreateDevice could not find "
             "one or more extensions");
         return false;
     } else if (VK_SUCCESS != vk_result) {
-        std::string error_msg = "GravityEngine::SetupInitalGraphicsDevice failed vkCreateDevice with ";
+        std::string error_msg = "GravityEngine::SetupInitialGraphicsDevice failed vkCreateDevice with ";
         error_msg += vk_result;
         logger.LogError(error_msg);
         return false;
@@ -1122,17 +1135,17 @@ bool GravityEngine::SetupInitalGraphicsDevice() {
 
     m_dev_ext_if = new GravityDeviceExtIf(m_vk_device);
     if (NULL == m_dev_ext_if) {
-        logger.LogError("GravityEngine::SetupInitalGraphicsDevice failed allocating GravityDeviceExtIf");
+        logger.LogError("GravityEngine::SetupInitialGraphicsDevice failed allocating GravityDeviceExtIf");
         return false;
     }
-    m_dev_memory = new GravityDeviceMemory(m_inst_ext_if, &m_vk_phys_dev);
-    if (nullptr == m_dev_memory) {
+    m_dev_memory_mgr = new GravityDeviceMemoryManager(m_inst_ext_if, &m_vk_phys_dev);
+    if (nullptr == m_dev_memory_mgr) {
         logger.LogError(
-            "GravityEngine::GravityEngine failed creating GravityDeviceMemory");
+            "GravityEngine::GravityEngine failed creating GravityDeviceMemoryManager");
         return false;
     }
 
-    m_dev_memory->SetupDevIf(m_dev_ext_if);
+    m_dev_memory_mgr->SetupDevIf(m_dev_ext_if);
 
     // Create a command pool so we can allocate one or more command buffers out of it.
     VkCommandPoolCreateInfo cmd_pool_create_info = {};
@@ -1142,7 +1155,7 @@ bool GravityEngine::SetupInitalGraphicsDevice() {
     cmd_pool_create_info.flags = 0;
     vk_result = vkCreateCommandPool(m_vk_device, &cmd_pool_create_info, nullptr, &m_vk_graphics_cmd_pool);
     if (VK_SUCCESS != vk_result) {
-        std::string error_msg = "GravityEngine::SetupInitalGraphicsDevice failed vkCreateCommandPool with ";
+        std::string error_msg = "GravityEngine::SetupInitialGraphicsDevice failed vkCreateCommandPool with ";
         error_msg += vk_result;
         logger.LogError(error_msg);
         return false;
@@ -1159,7 +1172,7 @@ bool GravityEngine::SetupInitalGraphicsDevice() {
     cmd_buf_alloc_info.commandBufferCount = 1;
     vk_result = vkAllocateCommandBuffers(m_vk_device, &cmd_buf_alloc_info, &cmd_buffer);
     if (VK_SUCCESS != vk_result) {
-        std::string error_msg = "GravityEngine::SetupInitalGraphicsDevice failed vkAllocateCommandBuffers with ";
+        std::string error_msg = "GravityEngine::SetupInitialGraphicsDevice failed vkAllocateCommandBuffers with ";
         error_msg += vk_result;
         logger.LogError(error_msg);
         return false;
@@ -1173,7 +1186,7 @@ bool GravityEngine::SetupInitalGraphicsDevice() {
         cmd_pool_create_info.queueFamilyIndex = m_present_queue.family_index;
         vk_result = vkCreateCommandPool(m_vk_device, &cmd_pool_create_info, nullptr, &m_vk_present_cmd_pool);
         if (VK_SUCCESS != vk_result) {
-            std::string error_msg = "GravityEngine::SetupInitalGraphicsDevice failed vkCreateCommandPool with ";
+            std::string error_msg = "GravityEngine::SetupInitialGraphicsDevice failed vkCreateCommandPool with ";
             error_msg += vk_result;
             error_msg += " for present command pool";
             logger.LogError(error_msg);
@@ -1190,7 +1203,7 @@ bool GravityEngine::SetupInitalGraphicsDevice() {
     cmd_buf_begin_info.pInheritanceInfo = nullptr;
     vk_result = vkBeginCommandBuffer(cmd_buffer, &cmd_buf_begin_info);
     if (VK_SUCCESS != vk_result) {
-        std::string error_msg = "GravityEngine::SetupInitalGraphicsDevice failed vkBeginCommandBuffer with ";
+        std::string error_msg = "GravityEngine::SetupInitialGraphicsDevice failed vkBeginCommandBuffer with ";
         error_msg += vk_result;
         logger.LogError(error_msg);
         return false;
@@ -1227,7 +1240,7 @@ bool GravityEngine::SetupInitalGraphicsDevice() {
         for (uint32_t iii = 0; iii < m_swapchain_surface.swapchain_images.size(); iii++) {
             vk_result = vkAllocateCommandBuffers(m_vk_device, &cmd_buf_alloc_info, &cmd_buffer);
             if (VK_SUCCESS != vk_result) {
-                std::string error_msg = "GravityEngine::SetupInitalGraphicsDevice failed vkAllocateCommandBuffers with ";
+                std::string error_msg = "GravityEngine::SetupInitialGraphicsDevice failed vkAllocateCommandBuffers with ";
                 error_msg += vk_result;
                 error_msg += " for present command buffer ";
                 error_msg += std::to_string(iii);
@@ -1238,7 +1251,7 @@ bool GravityEngine::SetupInitalGraphicsDevice() {
 
             vk_result = vkBeginCommandBuffer(cmd_buffer, &cmd_buf_info);
             if (VK_SUCCESS != vk_result) {
-                std::string error_msg = "GravityEngine::SetupInitalGraphicsDevice failed vkBeginCommandBuffer with ";
+                std::string error_msg = "GravityEngine::SetupInitialGraphicsDevice failed vkBeginCommandBuffer with ";
                 error_msg += vk_result;
                 error_msg += " for present command buffer ";
                 error_msg += std::to_string(iii);
@@ -1246,7 +1259,7 @@ bool GravityEngine::SetupInitalGraphicsDevice() {
                 return false;
             }
 
-            image_ownership_barrier.image = m_swapchain_surface.swapchain_images[iii].image;
+            image_ownership_barrier.image = m_swapchain_surface.swapchain_images[iii].vk_image;
             image_ownership_barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
             image_ownership_barrier.subresourceRange.baseMipLevel = 0;
             image_ownership_barrier.subresourceRange.levelCount = 1;
@@ -1257,7 +1270,7 @@ bool GravityEngine::SetupInitalGraphicsDevice() {
                                  VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, NULL, 0, NULL, 1, &image_ownership_barrier);
             vk_result = vkEndCommandBuffer(cmd_buffer);
             if (VK_SUCCESS != vk_result) {
-                std::string error_msg = "GravityEngine::SetupInitalGraphicsDevice failed vkEndCommandBuffer with ";
+                std::string error_msg = "GravityEngine::SetupInitialGraphicsDevice failed vkEndCommandBuffer with ";
                 error_msg += vk_result;
                 error_msg += " for present command buffer";
                 logger.LogError(error_msg);
@@ -1315,14 +1328,14 @@ bool GravityEngine::SetupSwapchain(GravityLogger &logger) {
     // the surface has no preferred format.  Otherwise, at least one
     if (count == 1 && surface_formats[0].format == VK_FORMAT_UNDEFINED) {
         logger.LogInfo("Forcing surface to BGRA8 format");
-        m_swapchain_surface.color_space = surface_formats[0].colorSpace;
+        m_swapchain_surface.vk_color_space = surface_formats[0].colorSpace;
     } else {
         VkFormat second_best_fmt = VK_FORMAT_UNDEFINED;
         VkColorSpaceKHR second_best_cs = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
         bool found_format = false;
         for (auto surf_fmt = surface_formats.begin(); surf_fmt != surface_formats.end(); ++surf_fmt) {
-            if (surf_fmt->format == m_swapchain_surface.format) {
-                m_swapchain_surface.color_space = surf_fmt->colorSpace;
+            if (surf_fmt->format == m_swapchain_surface.vk_format) {
+                m_swapchain_surface.vk_color_space = surf_fmt->colorSpace;
                 found_format = true;
                 break;
             } else {
@@ -1342,8 +1355,8 @@ bool GravityEngine::SetupSwapchain(GravityLogger &logger) {
             }
         }
         if (!found_format) {
-            m_swapchain_surface.format = second_best_fmt;
-            m_swapchain_surface.color_space = second_best_cs;
+            m_swapchain_surface.vk_format = second_best_fmt;
+            m_swapchain_surface.vk_color_space = second_best_cs;
             logger.LogWarning("Failed to find requested format.  Falling back to something standard");
         }
     }
@@ -1363,7 +1376,7 @@ bool GravityEngine::SetupSwapchain(GravityLogger &logger) {
     fence_create_info.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
     for (uint32_t i = 0; i < m_num_backbuffers; i++) {
-        vk_result = vkCreateFence(m_vk_device, &fence_create_info, nullptr, &m_swapchain_surface.fences[i]);
+        vk_result = vkCreateFence(m_vk_device, &fence_create_info, nullptr, &m_swapchain_surface.vk_fences[i]);
         if (VK_SUCCESS != vk_result) {
             std::string error_msg = "GravityEngine::SetupSwapchain failed vkCreateFence for buffer ";
             error_msg += std::to_string(i);
@@ -1372,7 +1385,7 @@ bool GravityEngine::SetupSwapchain(GravityLogger &logger) {
         }
 
         vk_result =
-            vkCreateSemaphore(m_vk_device, &semaphore_create_info, nullptr, &m_swapchain_surface.image_acquired_semaphores[i]);
+            vkCreateSemaphore(m_vk_device, &semaphore_create_info, nullptr, &m_swapchain_surface.vk_image_acquired_semaphores[i]);
         if (VK_SUCCESS != vk_result) {
             std::string error_msg = "GravityEngine::SetupSwapchain failed vkCreateSemaphore for buffer ";
             error_msg += std::to_string(i);
@@ -1382,7 +1395,7 @@ bool GravityEngine::SetupSwapchain(GravityLogger &logger) {
         }
 
         vk_result =
-            vkCreateSemaphore(m_vk_device, &semaphore_create_info, nullptr, &m_swapchain_surface.draw_complete_semaphores[i]);
+            vkCreateSemaphore(m_vk_device, &semaphore_create_info, nullptr, &m_swapchain_surface.vk_draw_complete_semaphores[i]);
         if (VK_SUCCESS != vk_result) {
             std::string error_msg = "GravityEngine::SetupSwapchain failed vkCreateSemaphore for buffer ";
             error_msg += std::to_string(i);
@@ -1393,7 +1406,7 @@ bool GravityEngine::SetupSwapchain(GravityLogger &logger) {
 
         if (m_separate_present_queue) {
             vk_result =
-                vkCreateSemaphore(m_vk_device, &semaphore_create_info, nullptr, &m_swapchain_surface.image_ownership_semaphores[i]);
+                vkCreateSemaphore(m_vk_device, &semaphore_create_info, nullptr, &m_swapchain_surface.vk_image_ownership_semaphores[i]);
             if (VK_SUCCESS != vk_result) {
                 std::string error_msg = "GravityEngine::SetupSwapchain failed vkCreateSemaphore for buffer ";
                 error_msg += std::to_string(i);
@@ -1473,7 +1486,7 @@ bool GravityEngine::SetupSwapchain(GravityLogger &logger) {
         return false;
     }
 
-    VkPresentModeKHR desired_present_mode = m_swapchain_surface.present_mode;
+    VkPresentModeKHR desired_present_mode = m_swapchain_surface.vk_present_mode;
     bool found_pm = false;
     while (!found_pm) {
         for (uint32_t pm = 0; pm < present_modes.size(); ++pm) {
@@ -1517,8 +1530,8 @@ bool GravityEngine::SetupSwapchain(GravityLogger &logger) {
     swapchain_create_info.pNext = nullptr;
     swapchain_create_info.surface = m_window->GetSurface();
     swapchain_create_info.minImageCount = m_num_backbuffers;
-    swapchain_create_info.imageFormat = m_swapchain_surface.format;
-    swapchain_create_info.imageColorSpace = m_swapchain_surface.color_space;
+    swapchain_create_info.imageFormat = m_swapchain_surface.vk_format;
+    swapchain_create_info.imageColorSpace = m_swapchain_surface.vk_color_space;
     swapchain_create_info.imageExtent.width = swapchain_extent.width;
     swapchain_create_info.imageExtent.height = swapchain_extent.height;
     swapchain_create_info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, swapchain_create_info.preTransform = surface_transform;
@@ -1567,7 +1580,7 @@ bool GravityEngine::SetupSwapchain(GravityLogger &logger) {
         image_view_create_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
         image_view_create_info.pNext = nullptr;
         image_view_create_info.flags = 0;
-        image_view_create_info.format = m_swapchain_surface.format;
+        image_view_create_info.format = m_swapchain_surface.vk_format;
         image_view_create_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
         image_view_create_info.components.r = VK_COMPONENT_SWIZZLE_R;
         image_view_create_info.components.g = VK_COMPONENT_SWIZZLE_G;
@@ -1581,7 +1594,7 @@ bool GravityEngine::SetupSwapchain(GravityLogger &logger) {
         image_view_create_info.image = swpchn_images[i];
 
         vk_result =
-            vkCreateImageView(m_vk_device, &image_view_create_info, nullptr, &m_swapchain_surface.swapchain_images[i].image_view);
+            vkCreateImageView(m_vk_device, &image_view_create_info, nullptr, &m_swapchain_surface.swapchain_images[i].vk_image_view);
         if (VK_SUCCESS != vk_result) {
             std::string message = "GravityEngine::SetupSwapchain failed ";
             message += std::to_string(i);
@@ -1590,7 +1603,7 @@ bool GravityEngine::SetupSwapchain(GravityLogger &logger) {
             return false;
         }
 
-        vk_result = vkCreateFence(m_vk_device, &fence_create_info, nullptr, &m_swapchain_surface.swapchain_images[i].fence);
+        vk_result = vkCreateFence(m_vk_device, &fence_create_info, nullptr, &m_swapchain_surface.swapchain_images[i].vk_fence);
         if (VK_SUCCESS != vk_result) {
             std::string message = "GravityEngine::SetupSwapchain failed ";
             message += std::to_string(i);
@@ -1599,7 +1612,7 @@ bool GravityEngine::SetupSwapchain(GravityLogger &logger) {
             return false;
         }
 
-        m_swapchain_surface.swapchain_images[i].image = swpchn_images[i];
+        m_swapchain_surface.swapchain_images[i].vk_image = swpchn_images[i];
     }
 
     return true;
@@ -1609,8 +1622,8 @@ void GravityEngine::CleanupSwapchain() {
     uint32_t i;
 
     for (i = 0; i < m_swapchain_surface.swapchain_images.size(); i++) {
-        vkDestroyImageView(m_vk_device, m_swapchain_surface.swapchain_images[i].image_view, nullptr);
-        vkDestroyFence(m_vk_device, m_swapchain_surface.swapchain_images[i].fence, nullptr);
+        vkDestroyImageView(m_vk_device, m_swapchain_surface.swapchain_images[i].vk_image_view, nullptr);
+        vkDestroyFence(m_vk_device, m_swapchain_surface.swapchain_images[i].vk_fence, nullptr);
         if (m_separate_present_queue) {
             vkFreeCommandBuffers(m_vk_device, m_vk_present_cmd_pool, 1,
                                  &m_swapchain_surface.swapchain_images[i].vk_present_cmd_buf);
@@ -1623,12 +1636,12 @@ void GravityEngine::CleanupSwapchain() {
     vkDestroySwapchainKHR(m_vk_device, m_swapchain_surface.vk_swapchain, nullptr);
 
     for (i = 0; i < m_num_backbuffers; i++) {
-        vkDestroyFence(m_vk_device, m_swapchain_surface.fences[i], nullptr);
-        vkDestroySemaphore(m_vk_device, m_swapchain_surface.image_acquired_semaphores[i], nullptr);
-        vkDestroySemaphore(m_vk_device, m_swapchain_surface.draw_complete_semaphores[i], nullptr);
+        vkDestroyFence(m_vk_device, m_swapchain_surface.vk_fences[i], nullptr);
+        vkDestroySemaphore(m_vk_device, m_swapchain_surface.vk_image_acquired_semaphores[i], nullptr);
+        vkDestroySemaphore(m_vk_device, m_swapchain_surface.vk_draw_complete_semaphores[i], nullptr);
 
         if (m_separate_present_queue) {
-            vkDestroySemaphore(m_vk_device, m_swapchain_surface.image_ownership_semaphores[i], nullptr);
+            vkDestroySemaphore(m_vk_device, m_swapchain_surface.vk_image_ownership_semaphores[i], nullptr);
         }
     }
 }
@@ -1637,13 +1650,12 @@ bool GravityEngine::SetupDepthStencilSurface(GravityLogger &logger) {
     VkResult vk_result = VK_SUCCESS;
     VkImageCreateInfo image_create_info = {};
     VkImageViewCreateInfo image_view_create_info = {};
-    VkMemoryRequirements mem_reqs = {};
 
     // Create an image for the depth/stencil surface
     image_create_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
     image_create_info.pNext = nullptr;
     image_create_info.imageType = VK_IMAGE_TYPE_2D;
-    image_create_info.format = m_depth_stencil_surface.format;
+    image_create_info.format = m_depth_stencil_surface.vk_format;
     image_create_info.extent.width = m_window->GetWidth();
     image_create_info.extent.height = m_window->GetHeight();
     image_create_info.extent.depth = 1;
@@ -1652,7 +1664,7 @@ bool GravityEngine::SetupDepthStencilSurface(GravityLogger &logger) {
     image_create_info.samples = VK_SAMPLE_COUNT_1_BIT;
     image_create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
     image_create_info.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-    vk_result = vkCreateImage(m_vk_device, &image_create_info, nullptr, &m_depth_stencil_surface.image);
+    vk_result = vkCreateImage(m_vk_device, &image_create_info, nullptr, &m_depth_stencil_surface.vk_image);
     if (VK_SUCCESS != vk_result) {
         std::string error_msg =
             "GravityEngine::SetupDepthStencilSurface failed to create image "
@@ -1663,14 +1675,15 @@ bool GravityEngine::SetupDepthStencilSurface(GravityLogger &logger) {
     }
 
     // See how much memory we require for the depth/stencil surface
-    vkGetImageMemoryRequirements(m_vk_device, m_depth_stencil_surface.image, &mem_reqs);
-    if (!m_dev_memory->AllocateMemory(mem_reqs, m_depth_stencil_surface.dev_memory)) {
-        logger.LogError("GravityEngine::SetupDepthStencilSurface failed GravityDeviceMemory->AllocateMemory call");
+    vkGetImageMemoryRequirements(m_vk_device, m_depth_stencil_surface.vk_image, &m_depth_stencil_surface.dev_memory.vk_mem_reqs);
+    if (!m_dev_memory_mgr->AllocateMemory(m_depth_stencil_surface.dev_memory, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)) {
+        logger.LogError("GravityEngine::SetupDepthStencilSurface failed GravityDeviceMemoryManager->AllocateMemory call");
         return false;
     }
 
     // Bind the image to the memory
-    vk_result = vkBindImageMemory(m_vk_device, m_depth_stencil_surface.image, m_depth_stencil_surface.dev_memory, 0);
+    vk_result =
+        vkBindImageMemory(m_vk_device, m_depth_stencil_surface.vk_image, m_depth_stencil_surface.dev_memory.vk_device_memory, 0);
     if (VK_SUCCESS != vk_result) {
         std::string error_msg =
             "GravityEngine::SetupDepthStencilSurface failed to bind image memory "
@@ -1684,15 +1697,15 @@ bool GravityEngine::SetupDepthStencilSurface(GravityLogger &logger) {
     image_view_create_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
     image_view_create_info.pNext = nullptr;
     image_view_create_info.flags = 0;
-    image_view_create_info.image = m_depth_stencil_surface.image;
-    image_view_create_info.format = m_depth_stencil_surface.format;
+    image_view_create_info.image = m_depth_stencil_surface.vk_image;
+    image_view_create_info.format = m_depth_stencil_surface.vk_format;
     image_view_create_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
     image_view_create_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
     image_view_create_info.subresourceRange.baseMipLevel = 0;
     image_view_create_info.subresourceRange.levelCount = 1;
     image_view_create_info.subresourceRange.baseArrayLayer = 0;
     image_view_create_info.subresourceRange.layerCount = 1;
-    vk_result = vkCreateImageView(m_vk_device, &image_view_create_info, NULL, &m_depth_stencil_surface.image_view);
+    vk_result = vkCreateImageView(m_vk_device, &image_view_create_info, NULL, &m_depth_stencil_surface.vk_image_view);
     if (VK_SUCCESS != vk_result) {
         std::string error_msg =
             "GravityEngine::SetupDepthStencilSurface failed to create image view "
@@ -1706,14 +1719,14 @@ bool GravityEngine::SetupDepthStencilSurface(GravityLogger &logger) {
 }
 
 void GravityEngine::CleanupDepthStencilSurface() {
-    if (VK_NULL_HANDLE != m_depth_stencil_surface.image_view) {
-        vkDestroyImageView(m_vk_device, m_depth_stencil_surface.image_view, nullptr);
+    if (VK_NULL_HANDLE != m_depth_stencil_surface.vk_image_view) {
+        vkDestroyImageView(m_vk_device, m_depth_stencil_surface.vk_image_view, nullptr);
     }
-    if (VK_NULL_HANDLE != m_depth_stencil_surface.image) {
-        vkDestroyImage(m_vk_device, m_depth_stencil_surface.image, nullptr);
+    if (VK_NULL_HANDLE != m_depth_stencil_surface.vk_image) {
+        vkDestroyImage(m_vk_device, m_depth_stencil_surface.vk_image, nullptr);
     }
-    if (VK_NULL_HANDLE != m_depth_stencil_surface.dev_memory) {
-        vkFreeMemory(m_vk_device, m_depth_stencil_surface.dev_memory, nullptr);
+    if (VK_NULL_HANDLE != m_depth_stencil_surface.dev_memory.vk_device_memory) {
+        vkFreeMemory(m_vk_device, m_depth_stencil_surface.dev_memory.vk_device_memory, nullptr);
     }
 }
 
@@ -1778,7 +1791,7 @@ bool GravityEngine::EndDrawFrame() {
                 .newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
                 .srcQueueFamilyIndex = m_graphics_queue.family_index,
                 .dstQueueFamilyIndex = m_present_queue.family_index,
-                .image = m_swapchain_surface.swapchain_images[m_swapchain_surface.cur_framebuffer].image,
+                .image = m_swapchain_surface.swapchain_images[m_swapchain_surface.cur_framebuffer].vk_image,
                 .subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1}};
 
             vkCmdPipelineBarrier(m_graphics_cmd_buffer.vk_cmd_buf, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
@@ -1789,12 +1802,12 @@ bool GravityEngine::EndDrawFrame() {
         m_graphics_cmd_buffer.recording = false;
     }
 
-    vkWaitForFences(m_vk_device, 1, &m_swapchain_surface.fences[cur_frame], VK_TRUE, UINT64_MAX);
-    vkResetFences(m_vk_device, 1, &m_swapchain_surface.fences[cur_frame]);
+    vkWaitForFences(m_vk_device, 1, &m_swapchain_surface.vk_fences[cur_frame], VK_TRUE, UINT64_MAX);
+    vkResetFences(m_vk_device, 1, &m_swapchain_surface.vk_fences[cur_frame]);
 
     // Get the index of the next available swapchain image:
     vk_result = m_dev_ext_if->AcquireNextImageKHR(m_vk_device, m_swapchain_surface.vk_swapchain, UINT64_MAX,
-                                                  m_swapchain_surface.image_acquired_semaphores[cur_frame], VK_NULL_HANDLE,
+                                                  m_swapchain_surface.vk_image_acquired_semaphores[cur_frame], VK_NULL_HANDLE,
                                                   &m_swapchain_surface.cur_framebuffer);
     if (VK_SUCCESS != vk_result) {
         std::string error_msg = "GravityEngine::EndDrawFrame failed AcquireNextImageKHR with error ";
@@ -1814,12 +1827,12 @@ bool GravityEngine::EndDrawFrame() {
     submit_info.pWaitDstStageMask = &pipe_stage_flags;
     pipe_stage_flags = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
     submit_info.waitSemaphoreCount = 1;
-    submit_info.pWaitSemaphores = &m_swapchain_surface.image_acquired_semaphores[cur_frame];
+    submit_info.pWaitSemaphores = &m_swapchain_surface.vk_image_acquired_semaphores[cur_frame];
     submit_info.commandBufferCount = 1;
     submit_info.pCommandBuffers = &m_graphics_cmd_buffer.vk_cmd_buf;
     submit_info.signalSemaphoreCount = 1;
-    submit_info.pSignalSemaphores = &m_swapchain_surface.draw_complete_semaphores[cur_frame];
-    vk_result = vkQueueSubmit(m_graphics_queue.vk_queue, 1, &submit_info, m_swapchain_surface.fences[cur_frame]);
+    submit_info.pSignalSemaphores = &m_swapchain_surface.vk_draw_complete_semaphores[cur_frame];
+    vk_result = vkQueueSubmit(m_graphics_queue.vk_queue, 1, &submit_info, m_swapchain_surface.vk_fences[cur_frame]);
     if (VK_SUCCESS != vk_result) {
         std::string error_msg = "GravityEngine::EndDrawFrame failed vkQueueSubmit with error ";
         error_msg += vk_result;
@@ -1837,16 +1850,16 @@ bool GravityEngine::EndDrawFrame() {
     present.pImageIndices = &m_swapchain_surface.cur_framebuffer;
     present.waitSemaphoreCount = 1;
     if (m_separate_present_queue) {
-        present.pWaitSemaphores = &m_swapchain_surface.image_ownership_semaphores[cur_frame];
+        present.pWaitSemaphores = &m_swapchain_surface.vk_image_ownership_semaphores[cur_frame];
 
         // If we are using separate queues, change image ownership to the
         // present queue before presenting, waiting for the draw complete
         // semaphore and signaling the ownership released semaphore when finished
         VkFence nullFence = VK_NULL_HANDLE;
         pipe_stage_flags = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-        submit_info.pWaitSemaphores = &m_swapchain_surface.draw_complete_semaphores[cur_frame];
+        submit_info.pWaitSemaphores = &m_swapchain_surface.vk_draw_complete_semaphores[cur_frame];
         submit_info.pCommandBuffers = &m_swapchain_surface.swapchain_images[m_swapchain_surface.cur_framebuffer].vk_present_cmd_buf;
-        submit_info.pSignalSemaphores = &m_swapchain_surface.image_ownership_semaphores[cur_frame];
+        submit_info.pSignalSemaphores = &m_swapchain_surface.vk_image_ownership_semaphores[cur_frame];
         vk_result = vkQueueSubmit(m_present_queue.vk_queue, 1, &submit_info, nullFence);
         if (VK_SUCCESS != vk_result) {
             std::string error_msg = "GravityEngine::EndDrawFrame failed present vkQueueSubmit with error ";
@@ -1856,7 +1869,7 @@ bool GravityEngine::EndDrawFrame() {
         }
         vk_result = m_dev_ext_if->QueuePresentKHR(m_present_queue.vk_queue, &present);
     } else {
-        present.pWaitSemaphores = &m_swapchain_surface.draw_complete_semaphores[cur_frame];
+        present.pWaitSemaphores = &m_swapchain_surface.vk_draw_complete_semaphores[cur_frame];
         vk_result = m_dev_ext_if->QueuePresentKHR(m_graphics_queue.vk_queue, &present);
     }
     if (VK_ERROR_OUT_OF_DATE_KHR == vk_result) {

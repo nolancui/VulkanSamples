@@ -25,17 +25,25 @@
 class GravityInstanceExtIf;
 class GravityDeviceExtIf;
 
-class GravityDeviceMemory {
-   public:
-    GravityDeviceMemory(GravityInstanceExtIf *inst_ext_if, VkPhysicalDevice *phys_dev);
-    ~GravityDeviceMemory();
+struct GravityDeviceMemory {
+    VkMemoryRequirements vk_mem_reqs;
+    uint32_t vk_memory_type_index;
+    uint32_t vk_memory_heap_index;
+    VkDeviceMemory vk_device_memory;
+};
 
-    GravityDeviceMemory(GravityDeviceMemory const &) = delete;
-    void operator=(GravityDeviceMemory const &) = delete;
+class GravityDeviceMemoryManager {
+   public:
+    GravityDeviceMemoryManager(GravityInstanceExtIf *inst_ext_if, VkPhysicalDevice *phys_dev);
+    ~GravityDeviceMemoryManager();
+
+    GravityDeviceMemoryManager(GravityDeviceMemoryManager const &) = delete;
+    void operator=(GravityDeviceMemoryManager const &) = delete;
 
     void SetupDevIf(GravityDeviceExtIf *dev_ext_if);
 
-    bool AllocateMemory(VkMemoryRequirements &mem_reqs, VkDeviceMemory &dev_memory);
+    bool AllocateMemory(GravityDeviceMemory &memory, const VkMemoryPropertyFlags &flags);
+    bool FreeMemory(GravityDeviceMemory &memory);
 
    private:
     GravityInstanceExtIf *m_inst_ext_if;

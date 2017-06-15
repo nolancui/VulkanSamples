@@ -25,11 +25,13 @@
 
 class GravityInstanceExtIf;
 class GravityDeviceExtIf;
+struct GravityDeviceMemory;
+class GravityDeviceMemoryManager;
 
 class GravityTexture {
    public:
     // Create a protected constructor
-    GravityTexture(GravityInstanceExtIf *inst_ext_if, GravityDeviceExtIf *dev_ext_if);
+    GravityTexture(GravityInstanceExtIf *inst_ext_if, GravityDeviceExtIf *dev_ext_if, GravityDeviceMemoryManager *dev_memory);
 
     // We don't want any copy constructors
     GravityTexture(const GravityTexture &texture) = delete;
@@ -40,10 +42,12 @@ class GravityTexture {
 
     bool Read(std::string const &filename);
     bool Load();
+    bool Unload();
 
    protected:
     GravityInstanceExtIf *m_inst_ext_if;
     GravityDeviceExtIf *m_dev_ext_if;
+    GravityDeviceMemoryManager *m_dev_memory_mgr;
 
     bool m_read;
     std::string m_filename;
@@ -54,7 +58,7 @@ class GravityTexture {
     uint8_t *m_cpu_data;
     VkFormat m_format;
     VkImage m_image;
-    VkDeviceMemory m_memory;
+    GravityDeviceMemory m_memory;
 
     bool ReadPPM(std::string const &filename);
     void Cleanup();

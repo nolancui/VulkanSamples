@@ -29,11 +29,12 @@
 #include <inttypes.h>
 
 #include "gravitylogger.hpp"
+#include "gravitydevicememory.hpp"
 #include "gravityscene.hpp"
 #include "gravityscenesplash.hpp"
 
 // Factory Method
-GravityScene *GravityScene::LoadScene(std::string scene_file, GravityInstanceExtIf *inst_ext_if, GravityDeviceExtIf *dev_ext_if) {
+GravityScene *GravityScene::ReadFile(std::string scene_file, GravityInstanceExtIf *inst_ext_if) {
     GravityScene *scene = nullptr;
     std::ifstream *stream = nullptr;
     Json::Reader reader;
@@ -86,7 +87,7 @@ GravityScene *GravityScene::LoadScene(std::string scene_file, GravityInstanceExt
 
     scene_class_name = root["scene"]["class"].asString().c_str();
     if (scene_class_name == "gravityscenesplash") {
-        scene = new GravitySceneSplash(root, inst_ext_if, dev_ext_if);
+        scene = new GravitySceneSplash(root, inst_ext_if);
     }
 
 out:
@@ -98,4 +99,10 @@ out:
     }
 
     return scene;
+}
+
+bool GravityScene::Load(GravityDeviceExtIf *dev_ext_if, GravityDeviceMemoryManager *dev_memory_mgr) {
+    m_dev_ext_if = dev_ext_if;
+    m_dev_memory_mgr = dev_memory_mgr;
+    return true;
 }

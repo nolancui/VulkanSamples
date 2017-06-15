@@ -18,6 +18,7 @@
  * Author: Mark Young <marky@lunarg.com>
  */
 
+#include <cstring>
 #include <fstream>
 #include <string>
 #include <sstream>
@@ -25,9 +26,11 @@
 #include "gravityinstanceextif.hpp"
 #include "gravitydeviceextif.hpp"
 #include "gravitylogger.hpp"
+#include "gravitydevicememory.hpp"
 #include "gravitytexture.hpp"
 
-GravityTexture::GravityTexture(GravityInstanceExtIf *inst_ext_if, GravityDeviceExtIf *dev_ext_if) {
+GravityTexture::GravityTexture(GravityInstanceExtIf *inst_ext_if, GravityDeviceExtIf *dev_ext_if,
+                               GravityDeviceMemoryManager *dev_memory_mgr) {
     m_read = false;
     m_filename = "";
     m_width = 0;
@@ -35,6 +38,9 @@ GravityTexture::GravityTexture(GravityInstanceExtIf *inst_ext_if, GravityDeviceE
     m_cpu_data = nullptr;
     m_inst_ext_if = inst_ext_if;
     m_dev_ext_if = dev_ext_if;
+    m_dev_memory_mgr = dev_memory_mgr;
+    memset(&m_memory, 0, sizeof(GravityDeviceMemory));
+    m_memory.vk_device_memory = VK_NULL_HANDLE;
 }
 
 GravityTexture::~GravityTexture() {
@@ -43,9 +49,12 @@ GravityTexture::~GravityTexture() {
 
 void GravityTexture::Cleanup() {
 //    vkDestroyImageView(m_dev_ext_if->m_device, demo->textures[i].view, NULL);
-    vkDestroyImage(m_dev_ext_if->m_device, m_image, NULL);
-//    vkFreeMemory(m_dev_ext_if->m_device, demo->textures[i].mem, NULL);
 //    vkDestroySampler(m_dev_ext_if->m_device, demo->textures[i].sampler, NULL);
+    if (VK_NULL_HANDLE != m_memory.vk_device_memory) {
+        Unload();
+    }
+    vkDestroyImage(m_dev_ext_if->m_device, m_image, NULL);
+
     if (nullptr != m_cpu_data) {
         delete[] m_cpu_data;
         m_cpu_data = nullptr;
@@ -57,6 +66,9 @@ void GravityTexture::Cleanup() {
 }
 
 bool GravityTexture::Read(std::string const &filename) {
+#if 0 // Brainpain
+return true;
+#else
     GravityLogger &logger = GravityLogger::getInstance();
 
     m_filename = filename;
@@ -69,7 +81,6 @@ bool GravityTexture::Read(std::string const &filename) {
 
     if (m_read) {
         VkImageCreateInfo image_create_info = {};
-        VkMemoryRequirements mem_reqs = {};
 
         image_create_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
         image_create_info.pNext = nullptr;
@@ -82,7 +93,7 @@ bool GravityTexture::Read(std::string const &filename) {
         image_create_info.mipLevels = 1;
         image_create_info.arrayLayers = 1;
         image_create_info.samples = VK_SAMPLE_COUNT_1_BIT;
-        image_create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
+        image_create_info.tiling = VK_IMAGE_TILING_LINEAR; // Brainpain - VK_IMAGE_TILING_OPTIMAL;
         image_create_info.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
         image_create_info.initialLayout = VK_IMAGE_LAYOUT_PREINITIALIZED;
 
@@ -97,7 +108,7 @@ bool GravityTexture::Read(std::string const &filename) {
         }
 
         // Get the memory requirements for this image
-        vkGetImageMemoryRequirements(m_dev_ext_if->m_device, m_image, &mem_reqs);
+        vkGetImageMemoryRequirements(m_dev_ext_if->m_device, m_image, &m_memory.vk_mem_reqs);
     }
 
 out:
@@ -107,6 +118,7 @@ out:
     }
 
     return m_read;
+#endif
 }
 
 bool GravityTexture::ReadPPM(std::string const &filename) {
@@ -132,7 +144,10 @@ bool GravityTexture::ReadPPM(std::string const &filename) {
 
     m_cpu_data = new uint8_t[m_width * m_height * m_num_comps * m_comp_bytes];
     infile.read(reinterpret_cast<char*>(m_cpu_data), m_width * m_height * m_num_comps * m_comp_bytes);
-    read = true;
+
+    m_format = VK_FORMAT_R8G8B8A8_UNORM;
+
+   read = true;
 
 out:
     infile.close();
@@ -140,44 +155,13 @@ out:
 }
 
 bool GravityTexture::Load() {
-}
-#if 0
-
-static bool memory_type_from_properties(struct demo *demo, uint32_t typeBits,
-                                        VkFlags requirements_mask,
-                                        uint32_t *typeIndex) {
-    // Search memtypes to find first index with those properties
-    for (uint32_t i = 0; i < VK_MAX_MEMORY_TYPES; i++) {
-        if ((typeBits & 1) == 1) {
-            // Type is available, does it match user properties?
-            if ((demo->memory_properties.memoryTypes[i].propertyFlags &
-                 requirements_mask) == requirements_mask) {
-                *typeIndex = i;
-                return true;
-            }
-        }
-        typeBits >>= 1;
+    GravityLogger &logger = GravityLogger::getInstance();
+    if (!m_dev_memory_mgr->AllocateMemory(m_memory, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)) {
+        logger.LogError("GravityTexture::Load failed GravityDeviceMemoryManager->AllocateMemory call");
+        return false;
     }
-    // No memory types matched, return failure
-    return false;
-}
 
-
-    tex_obj->mem_alloc.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-    tex_obj->mem_alloc.pNext = NULL;
-    tex_obj->mem_alloc.allocationSize = mem_reqs.size;
-    tex_obj->mem_alloc.memoryTypeIndex = 0;
-
-    pass = memory_type_from_properties(demo, mem_reqs.memoryTypeBits,
-                                       required_props,
-                                       &tex_obj->mem_alloc.memoryTypeIndex);
-    assert(pass);
-
-    /* allocate memory */
-    err = vkAllocateMemory(demo->device, &tex_obj->mem_alloc, NULL,
-                           &(tex_obj->mem));
-    assert(!err);
-
+#if 0
     /* bind memory */
     err = vkBindImageMemory(demo->device, tex_obj->image, tex_obj->mem, 0);
     assert(!err);
@@ -206,5 +190,43 @@ static bool memory_type_from_properties(struct demo *demo, uint32_t typeBits,
     }
 
     tex_obj->imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-}
 #endif
+
+    return false;
+}
+
+bool GravityTexture::Unload() {
+    m_dev_memory_mgr->FreeMemory(m_memory);
+
+#if 0
+    /* bind memory */
+    err = vkBindImageMemory(demo->device, tex_obj->image, tex_obj->mem, 0);
+    assert(!err);
+
+    if (required_props & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) {
+        const VkImageSubresource subres = {
+            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+            .mipLevel = 0,
+            .arrayLayer = 0,
+        };
+        VkSubresourceLayout layout;
+        void *data;
+
+        vkGetImageSubresourceLayout(demo->device, tex_obj->image, &subres,
+                                    &layout);
+
+        err = vkMapMemory(demo->device, tex_obj->mem, 0,
+                          tex_obj->mem_alloc.allocationSize, 0, &data);
+        assert(!err);
+
+        if (!loadTexture(filename, data, &layout, &tex_width, &tex_height)) {
+            fprintf(stderr, "Error loading texture: %s\n", filename);
+        }
+
+        vkUnmapMemory(demo->device, tex_obj->mem);
+    }
+
+    tex_obj->imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+#endif
+    return true;
+}

@@ -29,7 +29,7 @@
 #include "gravitydeviceextif.hpp"
 #include "gravitydevicememory.hpp"
 
-GravityDeviceMemory::GravityDeviceMemory(GravityInstanceExtIf *inst_ext_if, VkPhysicalDevice *phys_dev) {
+GravityDeviceMemoryManager::GravityDeviceMemoryManager(GravityInstanceExtIf *inst_ext_if, VkPhysicalDevice *phys_dev) {
     m_inst_ext_if = inst_ext_if;
     m_dev_ext_if = nullptr;
     m_vk_phys_dev = phys_dev;
@@ -39,16 +39,16 @@ GravityDeviceMemory::GravityDeviceMemory(GravityInstanceExtIf *inst_ext_if, VkPh
     vkGetPhysicalDeviceMemoryProperties(*phys_dev, &m_vk_dev_mem_props);
 }
 
-GravityDeviceMemory::~GravityDeviceMemory() {
+GravityDeviceMemoryManager::~GravityDeviceMemoryManager() {
     m_inst_ext_if = nullptr;
     m_dev_ext_if = nullptr;
 }
 
-void GravityDeviceMemory::SetupDevIf(GravityDeviceExtIf *dev_ext_if) {
+void GravityDeviceMemoryManager::SetupDevIf(GravityDeviceExtIf *dev_ext_if) {
     m_dev_ext_if = dev_ext_if;
 }
 
-bool GravityDeviceMemory::AllocateMemory(VkMemoryRequirements &mem_reqs, VkDeviceMemory &dev_memory) {
+bool GravityDeviceMemoryManager::AllocateMemory(GravityDeviceMemory &memory, const VkMemoryPropertyFlags &flags) {
     GravityLogger &logger = GravityLogger::getInstance();
     VkMemoryAllocateInfo mem_alloc_info = {};
     VkResult vk_result = VK_SUCCESS;
@@ -56,19 +56,20 @@ bool GravityDeviceMemory::AllocateMemory(VkMemoryRequirements &mem_reqs, VkDevic
     // Allocate the memory, in the correct location
     mem_alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     mem_alloc_info.pNext = NULL;
-    mem_alloc_info.allocationSize = mem_reqs.size;
+    mem_alloc_info.allocationSize = memory.vk_mem_reqs.size;
     mem_alloc_info.memoryTypeIndex = 0;
 
     bool found_mem_type = false;
-    for (uint32_t mem_type = 0; mem_type < VK_MAX_MEMORY_TYPES; mem_type++) {
-        if (mem_reqs.memoryTypeBits & 0x1) {
-            if ((m_vk_dev_mem_props.memoryTypes[mem_type].propertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)) {
-                mem_alloc_info.memoryTypeIndex = mem_type;
-                found_mem_type = true;
-                break;
-            }
+    uint32_t type_bits = memory.vk_mem_reqs.memoryTypeBits;
+    for (uint32_t mem_type = 0; mem_type < m_vk_dev_mem_props.memoryTypeCount; mem_type++) {
+        if ((type_bits & 0x1) && ((m_vk_dev_mem_props.memoryTypes[mem_type].propertyFlags & flags) == flags)) {
+            mem_alloc_info.memoryTypeIndex = mem_type;
+            found_mem_type = true;
+            memory.vk_memory_type_index = mem_type;
+            memory.vk_memory_heap_index = m_vk_dev_mem_props.memoryTypes[mem_type].heapIndex;
+            break;
         }
-        mem_reqs.memoryTypeBits >>= 1;
+        type_bits >>= 1;
     }
     if (!found_mem_type) {
         logger.LogError(
@@ -77,8 +78,16 @@ bool GravityDeviceMemory::AllocateMemory(VkMemoryRequirements &mem_reqs, VkDevic
         return false;
     }
 
+    if (m_vk_dev_mem_props.memoryHeaps[memory.vk_memory_heap_index].size < memory.vk_mem_reqs.size) {
+        logger.LogError(
+            "GravityDeviceMemory::AllocateMemory not enough memory remaining in that heap");
+        return false;
+    }
+    
+    m_vk_dev_mem_props.memoryHeaps[memory.vk_memory_heap_index].size -= memory.vk_mem_reqs.size;
+
     // Allocate memory for the depth/stencil buffer
-    vk_result = vkAllocateMemory(m_dev_ext_if->m_device, &mem_alloc_info, nullptr, &dev_memory);
+    vk_result = vkAllocateMemory(m_dev_ext_if->m_device, &mem_alloc_info, nullptr, &memory.vk_device_memory);
     if (VK_SUCCESS != vk_result) {
         std::string error_msg =
             "GravityDeviceMemory::AllocateMemory failed to allocate device memory "
@@ -89,4 +98,19 @@ bool GravityDeviceMemory::AllocateMemory(VkMemoryRequirements &mem_reqs, VkDevic
     }
 
     return true;
+}
+
+bool GravityDeviceMemoryManager::FreeMemory(GravityDeviceMemory &memory) {
+    if (VK_NULL_HANDLE != memory.vk_device_memory) {
+        vkFreeMemory(m_dev_ext_if->m_device, memory.vk_device_memory, NULL);
+
+        // Re-add the memory back to the heap size
+        m_vk_dev_mem_props.memoryHeaps[memory.vk_memory_heap_index].size += memory.vk_mem_reqs.size;
+
+        // Clear the memory handle so we don't accidentally try to re-free it.
+        memory.vk_device_memory = VK_NULL_HANDLE;
+        return true;
+    }
+
+    return false;
 }

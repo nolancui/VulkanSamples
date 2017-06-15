@@ -27,11 +27,12 @@ class GravityTexture;
 class GravitySceneSplash : public GravityScene {
    public:
     // Create a protected constructor
-    GravitySceneSplash(Json::Value &root, GravityInstanceExtIf *inst_ext_if, GravityDeviceExtIf *dev_ext_if);
+    GravitySceneSplash(Json::Value &root, GravityInstanceExtIf *inst_ext_if);
 
     // Make the destructor public
     virtual ~GravitySceneSplash();
 
+    virtual bool Load(GravityDeviceExtIf *dev_ext_if, GravityDeviceMemoryManager *dev_memory_mgr);
     virtual bool Start();
     virtual bool Update(float comp_time, float game_time);
     virtual bool Draw();

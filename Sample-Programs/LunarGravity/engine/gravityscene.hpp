@@ -26,17 +26,17 @@
 
 class GravityInstanceExtIf;
 class GravityDeviceExtIf;
+class GravityDeviceMemoryManager;
 
 class GravityScene {
    public:
     // Factory Method
-    static GravityScene *LoadScene(std::string scene_file, GravityInstanceExtIf *inst_ext_if, GravityDeviceExtIf *dev_ext_if);
+    static GravityScene *ReadFile(std::string scene_file, GravityInstanceExtIf *inst_ext_if);
 
     // Create a protected constructor
-    GravityScene(Json::Value &root, GravityInstanceExtIf *inst_ext_if, GravityDeviceExtIf *dev_ext_if) {
+    GravityScene(Json::Value &root, GravityInstanceExtIf *inst_ext_if) {
         m_root = root;
         m_inst_ext_if = inst_ext_if;
-        m_dev_ext_if = dev_ext_if;
     }
 
     // We don't want any copy constructors
@@ -45,7 +45,8 @@ class GravityScene {
 
     // Make the destructor public
     virtual ~GravityScene() { ; }
-
+    
+    virtual bool Load(GravityDeviceExtIf *dev_ext_if, GravityDeviceMemoryManager *dev_memory_mgr);
     virtual bool Start() = 0;
     virtual bool Update(float comp_time, float game_time) = 0;
     virtual bool Draw() = 0;
@@ -56,4 +57,5 @@ class GravityScene {
     Json::Value m_root;
     GravityInstanceExtIf *m_inst_ext_if;
     GravityDeviceExtIf *m_dev_ext_if;
+    GravityDeviceMemoryManager *m_dev_memory_mgr;
 };
