@@ -77,9 +77,9 @@ endif()
 macro(generate_gravity_spv input output)
     add_custom_command(
         OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/resources/shaders/${output}
-        COMMAND ${GLSLANG_VALIDATOR} -s -V -o ${CMAKE_CURRENT_BINARY_DIR}/resources/shaders/${output} ${PROJECT_SOURCE_DIR}/Sample-Programs/LunarGravity/resources/shaders/${input}
-        DEPENDS ${GLSLANG_VALIDATOR} ${PROJECT_SOURCE_DIR}/Sample-Programs/LunarGravity/resources/shaders/${input}
-        COMMENT "Converting ${PROJECT_SOURCE_DIR}/Sample-Programs/LunarGravity/resources/shaders/${input} to ${CMAKE_CURRENT_BINARY_DIR}/resources/shaders/${output}"
+        COMMAND ${GLSLANG_VALIDATOR} -s -V -o ${CMAKE_CURRENT_BINARY_DIR}/resources/shaders/${output} ${PROJECT_SOURCE_DIR}/Sample-Programs/LunarGravity/resources/shaders/source/${input}
+        DEPENDS ${GLSLANG_VALIDATOR} ${PROJECT_SOURCE_DIR}/Sample-Programs/LunarGravity/resources/shaders/source/${input}
+        COMMENT "Converting ${PROJECT_SOURCE_DIR}/Sample-Programs/LunarGravity/resources/shaders/source/${input} to ${CMAKE_CURRENT_BINARY_DIR}/resources/shaders/${output}"
     )
 endmacro()
 
@@ -92,9 +92,6 @@ if(WIN32)
         endif()
     endforeach()
 endif()
-
-generate_gravity_spv(simple_single_tex.vert simple_single_tex-vs.spv)
-generate_gravity_spv(simple_single_tex.frag simple_single_tex-fs.spv)
 
 if(WIN32)
 	set(GRAVITY_OS_SOURCES
@@ -116,33 +113,50 @@ else()
 	)
 endif()
 
-add_executable(LunarGravity
-                ${CMAKE_CURRENT_BINARY_DIR}/resources/shaders/simple_single_tex-vs.spv
-                ${CMAKE_CURRENT_BINARY_DIR}/resources/shaders/simple_single_tex-fs.spv
-                ${JSONCPP_SOURCE_DIR}/jsoncpp.cpp
-                utils/gravitylogger.cpp
-                utils/gravitylogger.hpp
-                utils/gravitysettingreader.hpp
-                utils/gravitysettingreader.cpp
-                utils/gravityevent.cpp
-                utils/gravityevent.hpp
-                utils/gravityclock.hpp
-                utils/gravitydeviceextif.cpp
-                utils/gravitydeviceextif.hpp
-                utils/gravityinstanceextif.cpp
-                utils/gravityinstanceextif.hpp
-                ${GRAVITY_OS_SOURCES}
-                engine/gravitydevicememory.cpp
-                engine/gravitydevicememory.hpp
-                engine/gravitytexture.cpp
-                engine/gravitytexture.hpp
-                engine/gravityscene.cpp
-                engine/gravityscene.hpp
-                engine/gravityscenesplash.cpp
-                engine/gravityscenesplash.hpp
-                engine/gravityengine.cpp
-                engine/gravityengine.hpp
-                gravitydemo.cpp
-                gravitydemo.hpp
-                main.cpp)
+set(EXECUTABLE_FILES
+    ${JSONCPP_SOURCE_DIR}/jsoncpp.cpp
+    utils/gravitylogger.cpp
+    utils/gravitylogger.hpp
+    utils/gravitysettingreader.hpp
+    utils/gravitysettingreader.cpp
+    utils/gravityevent.cpp
+    utils/gravityevent.hpp
+    utils/gravityclock.hpp
+    utils/gravitydeviceextif.cpp
+    utils/gravitydeviceextif.hpp
+    utils/gravityinstanceextif.cpp
+    utils/gravityinstanceextif.hpp
+    ${GRAVITY_OS_SOURCES}
+    engine/gravitydevicememory.cpp
+    engine/gravitydevicememory.hpp
+    engine/gravityshader.cpp
+    engine/gravityshader.hpp
+    engine/gravitytexture.cpp
+    engine/gravitytexture.hpp
+    engine/gravityscene.cpp
+    engine/gravityscene.hpp
+    engine/gravityscenesplash.cpp
+    engine/gravityscenesplash.hpp
+    engine/gravityengine.cpp
+    engine/gravityengine.hpp
+    gravitydemo.cpp
+    gravitydemo.hpp
+    main.cpp
+   )
+
+set(GRAVITY_SHADER_PREFIXES
+    splash_shader
+   )
+
+foreach (shader_prefix ${GRAVITY_SHADER_PREFIXES})
+    generate_gravity_spv(${shader_prefix}.vert ${shader_prefix}-vs.spv)
+    generate_gravity_spv(${shader_prefix}.frag ${shader_prefix}-fs.spv)
+    set(EXECUTABLE_FILES
+        ${EXECUTABLE_FILES}
+        ${CMAKE_CURRENT_BINARY_DIR}/resources/shaders/${shader_prefix}-vs.spv
+        ${CMAKE_CURRENT_BINARY_DIR}/resources/shaders/${shader_prefix}-fs.spv
+       )
+endforeach(shader_prefix)
+
+add_executable(LunarGravity ${EXECUTABLE_FILES})
 target_link_libraries(LunarGravity ${LIBRARIES})

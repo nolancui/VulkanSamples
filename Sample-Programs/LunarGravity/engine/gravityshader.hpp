@@ -1,5 +1,5 @@
 /*
- * LunarGravity - gravityscene.hpp
+ * LunarGravity - gravityshader.hpp
  *
  * Copyright (C) 2017 LunarG, Inc.
  *
@@ -21,45 +21,53 @@
 #pragma once
 
 #include <string>
-
-#include <json/json.h>
+#include <vulkan/vulkan.h>
 
 class GravityInstanceExtIf;
 class GravityDeviceExtIf;
+struct GravityDeviceMemory;
 class GravityDeviceMemoryManager;
 
-class GravityScene {
-   public:
-    // Factory Method
-    static GravityScene *ReadFile(std::string scene_file, GravityInstanceExtIf *inst_ext_if);
+enum GravityShaderStage {
+    GRAVITY_SHADER_VERTEX = 0,
+    GRAVITY_SHADER_TESSELLATION_CONTROL,
+    GRAVITY_SHADER_TESSELLATION_EVALUATION,
+    GRAVITY_SHADER_GEOMETRY,
+    GRAVITY_SHADER_FRAGMENT,
+    GRAVITY_SHADER_NUM_STAGES
+};
 
+struct GravityShaderData {
+    bool valid;
+    VkShaderStageFlagBits vk_shader_flag;
+    VkShaderModule vk_shader_module;
+};
+
+class GravityShader {
+   public:
     // Create a protected constructor
-    GravityScene(std::string &scene_file, Json::Value &root, GravityInstanceExtIf *inst_ext_if) {
-        m_scene_file = scene_file;
-        m_root = root;
-        m_inst_ext_if = inst_ext_if;
-    }
+    GravityShader(GravityInstanceExtIf *inst_ext_if, GravityDeviceExtIf *dev_ext_if, GravityDeviceMemoryManager *dev_memory);
 
     // We don't want any copy constructors
-    GravityScene(const GravityScene &scene) = delete;
-    GravityScene &operator=(const GravityScene &scene) = delete;
+    GravityShader(const GravityShader &shader) = delete;
+    GravityShader &operator=(const GravityShader &shader) = delete;
 
     // Make the destructor public
-    virtual ~GravityScene() { ; }
-    
-    virtual bool Load(GravityDeviceExtIf *dev_ext_if, GravityDeviceMemoryManager *dev_memory_mgr);
-    virtual bool Start() = 0;
-    virtual bool Update(float comp_time, float game_time) = 0;
-    virtual bool Draw() = 0;
-    virtual bool End() = 0;
-    virtual bool Unload() = 0;
+    virtual ~GravityShader();
+
+    bool Read(std::string const &shader_prefix);
+    bool Load();
+    bool Unload();
 
    protected:
-    std::string m_scene_file;
-
-    // Json Root info
-    Json::Value m_root;
     GravityInstanceExtIf *m_inst_ext_if;
     GravityDeviceExtIf *m_dev_ext_if;
     GravityDeviceMemoryManager *m_dev_memory_mgr;
+
+    bool m_read;
+    std::string m_shader_prefix;
+    GravityShaderData m_shader_data[GRAVITY_SHADER_NUM_STAGES];
+    GravityDeviceMemory m_memory;
+
+    void Cleanup();
 };

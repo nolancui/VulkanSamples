@@ -4,39 +4,27 @@
     "name": "Gravity Splash Scene",
     "class": "gravityscenesplash",
     "version": "1",
-    "textures" : [
-      {
+    "data" : {
+      "texture" : {
+        "index" : 0,
         "name" : "LunarG Logo Texture",
         "file" : "lunarg.ppm"
-      }
-    ],
-    "shader groups" : [
-      {
+      },
+      "shader" : {
         "name" : "Splash Shader Group",
-        "vertex shader" : "splash_shader-vs.spv",
-        "fragment shader" : "splash_shader-fs.spv"
-      }
-    ],
-    "verts" : [
-      {
-        "name" : "Fullscreen Quad",
-        "vertex components" : "3",
-        "texture coord groups" : "1",
-        "texture coord components" : "2",
+        "prefix" : "splash_shader"
+      },
+      "vertices" : {
+        "vertex components" : 3,
+        "texture coord groups" : 1,
+        "texture coord components" : 2,
         "data" : [
           -1.0, -1.0, 0.0, 0.0, 1.0,
           -1.0,  1.0, 0.0, 0.0, 0.0,
-           1.0,  1.0, 0.0, 1.0, 0.0,
-           1.0, -1.0, 0.0, 1.0, 1.0
+          1.0,  1.0, 0.0, 1.0, 0.0,
+          1.0, -1.0, 0.0, 1.0, 1.0
         ]
       }
-    ],
-    "models" : [
-      {
-        "verts" : "Fullscene Quad",
-        "textures" : [ "LunarG Logo Texture" ],
-        "shader group" : [ "Splash Shader Group" ]
-      }
-    ]
+    }
   }
 }

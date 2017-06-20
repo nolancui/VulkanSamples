@@ -85,9 +85,17 @@ GravityScene *GravityScene::ReadFile(std::string scene_file, GravityInstanceExtI
         goto out;
     }
 
+    if (root["scene"]["data"].isNull()) {
+        std::string error_msg = "GravityScene::LoadScene - Scene file ";
+        error_msg += scene_file.c_str();
+        error_msg += " missing 'scene', 'data' value";
+        logger.LogError(error_msg);
+        goto out;
+    }
+
     scene_class_name = root["scene"]["class"].asString().c_str();
     if (scene_class_name == "gravityscenesplash") {
-        scene = new GravitySceneSplash(root, inst_ext_if);
+        scene = new GravitySceneSplash(scene_file, root["scene"]["data"], inst_ext_if);
     }
 
 out:

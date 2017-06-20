@@ -20,14 +20,37 @@
 
 #pragma once
 
+#include <vector>
+
 #include "gravityscene.hpp"
 
 class GravityTexture;
+class GravityShader;
+
+struct SplashTexture {
+    std::string name;
+    std::string file;
+    uint8_t index;
+    GravityTexture *texture;
+};
+
+struct SplashShader {
+    std::string name;
+    std::string prefix;
+    GravityShader *shader;
+};
+
+struct SplashShaderVerts {
+    uint8_t num_vert_comps;
+    uint8_t num_tex_coords;
+    uint8_t num_tex_coord_comps;
+    std::vector<float> data;
+};
 
 class GravitySceneSplash : public GravityScene {
    public:
     // Create a protected constructor
-    GravitySceneSplash(Json::Value &root, GravityInstanceExtIf *inst_ext_if);
+    GravitySceneSplash(std::string &scene_file, Json::Value &root, GravityInstanceExtIf *inst_ext_if);
 
     // Make the destructor public
     virtual ~GravitySceneSplash();
@@ -37,11 +60,14 @@ class GravitySceneSplash : public GravityScene {
     virtual bool Update(float comp_time, float game_time);
     virtual bool Draw();
     virtual bool End();
+    virtual bool Unload();
 
    protected:
     // We don't want any copy constructors
     GravitySceneSplash(const GravitySceneSplash &scene) = delete;
     GravitySceneSplash &operator=(const GravitySceneSplash &scene) = delete;
 
-    GravityTexture *m_texture;
+    SplashShader m_shader;
+    SplashTexture m_texture;
+    SplashShaderVerts m_vertices;
 };

@@ -397,10 +397,13 @@ GravityEngine::~GravityEngine() {
     vkDestroyInstance(m_vk_inst, NULL);
 
     if (nullptr != m_cur_scene) {
+        m_cur_scene->End();
+        m_cur_scene->Unload();
         delete m_cur_scene;
         m_cur_scene = nullptr;
     }
     if (nullptr != m_next_scene) {
+        m_cur_scene->Unload();
         delete m_next_scene;
         m_next_scene = nullptr;
     }
