@@ -56,8 +56,8 @@ class GravityTexture {
     uint8_t m_num_comps;
     uint8_t m_comp_bytes;
     uint8_t *m_cpu_data;
-    VkFormat m_format;
-    VkImage m_image;
+    VkFormat m_vk_format;
+    VkImage m_vk_image;
     GravityDeviceMemory m_memory;
 
     bool ReadPPM(std::string const &filename);

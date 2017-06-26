@@ -53,7 +53,7 @@ void GravityTexture::Cleanup() {
     if (VK_NULL_HANDLE != m_memory.vk_device_memory) {
         Unload();
     }
-    vkDestroyImage(m_dev_ext_if->m_device, m_image, NULL);
+    vkDestroyImage(m_dev_ext_if->m_device, m_vk_image, NULL);
 
     if (nullptr != m_cpu_data) {
         delete[] m_cpu_data;
@@ -84,7 +84,7 @@ bool GravityTexture::Read(std::string const &filename) {
         image_create_info.pNext = nullptr;
         image_create_info.flags = 0;
         image_create_info.imageType = VK_IMAGE_TYPE_2D;
-        image_create_info.format = m_format;
+        image_create_info.format = m_vk_format;
         image_create_info.extent.width = m_width;
         image_create_info.extent.height = m_height;
         image_create_info.extent.depth = 1;
@@ -95,7 +95,7 @@ bool GravityTexture::Read(std::string const &filename) {
         image_create_info.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
         image_create_info.initialLayout = VK_IMAGE_LAYOUT_PREINITIALIZED;
 
-        VkResult vk_result = vkCreateImage(m_dev_ext_if->m_device, &image_create_info, nullptr, &m_image);
+        VkResult vk_result = vkCreateImage(m_dev_ext_if->m_device, &image_create_info, nullptr, &m_vk_image);
         if (VK_SUCCESS != vk_result) {
             std::string error_msg =
                 "GravityTexture::Read failed call to vkCreateImage with error ";
@@ -105,7 +105,7 @@ bool GravityTexture::Read(std::string const &filename) {
         }
 
         // Get the memory requirements for this image
-        vkGetImageMemoryRequirements(m_dev_ext_if->m_device, m_image, &m_memory.vk_mem_reqs);
+        vkGetImageMemoryRequirements(m_dev_ext_if->m_device, m_vk_image, &m_memory.vk_mem_reqs);
     }
 
 out:
@@ -153,7 +153,7 @@ bool GravityTexture::ReadPPM(std::string const &filename) {
     m_cpu_data = new uint8_t[m_width * m_height * m_num_comps * m_comp_bytes];
     infile->read(reinterpret_cast<char*>(m_cpu_data), m_width * m_height * m_num_comps * m_comp_bytes);
 
-    m_format = VK_FORMAT_R8G8B8A8_UNORM;
+    m_vk_format = VK_FORMAT_R8G8B8A8_UNORM;
 
    read = true;
 
@@ -172,13 +172,6 @@ bool GravityTexture::Load() {
         return false;
     }
 
-    // Bind the texture memory at this point
-    vk_result = vkBindImageMemory(m_dev_ext_if->m_device, m_image, m_memory.vk_device_memory, 0);
-    if (VK_SUCCESS != vk_result) {
-        logger.LogError("GravityTexture::Load failed vkBindImageMemory");
-        return false;
-    }
-
     VkSubresourceLayout layout;
     void *data = nullptr;
     VkImageSubresource image_sub_resource = {};
@@ -186,7 +179,7 @@ bool GravityTexture::Load() {
     image_sub_resource.mipLevel = 0;
     image_sub_resource.arrayLayer = 0;
 
-    vkGetImageSubresourceLayout(m_dev_ext_if->m_device, m_image, &image_sub_resource, &layout);
+    vkGetImageSubresourceLayout(m_dev_ext_if->m_device, m_vk_image, &image_sub_resource, &layout);
 
     vk_result = vkMapMemory(m_dev_ext_if->m_device, m_memory.vk_device_memory, 0, m_memory.vk_mem_reqs.size, 0, &data);
     if (VK_SUCCESS != vk_result) {
@@ -214,13 +207,23 @@ bool GravityTexture::Load() {
 
     vkUnmapMemory(m_dev_ext_if->m_device, m_memory.vk_device_memory);
 
+    // Bind the texture memory at this point
+    vk_result = vkBindImageMemory(m_dev_ext_if->m_device, m_vk_image, m_memory.vk_device_memory, 0);
+    if (VK_SUCCESS != vk_result) {
+        logger.LogError("GravityTexture::Load failed vkBindImageMemory");
+        return false;
+    }
+
 //    tex_obj->imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
     return true;
 }
 
 bool GravityTexture::Unload() {
-    m_dev_memory_mgr->FreeMemory(m_memory);
+    if (VK_NULL_HANDLE != m_memory.vk_device_memory) {
+        m_dev_memory_mgr->FreeMemory(m_memory);
+        m_memory.vk_device_memory = VK_NULL_HANDLE;
+    }
 
     return true;
 }

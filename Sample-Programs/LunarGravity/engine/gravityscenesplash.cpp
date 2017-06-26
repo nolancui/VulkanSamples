@@ -22,6 +22,7 @@
 #include "gravitydevicememory.hpp"
 #include "gravitytexture.hpp"
 #include "gravityshader.hpp"
+#include "gravityuniformbuffer.hpp"
 #include "gravityscenesplash.hpp"
 
 GravitySceneSplash::GravitySceneSplash(std::string &scene_file, Json::Value &root, GravityInstanceExtIf *inst_ext_if)
@@ -76,6 +77,10 @@ GravitySceneSplash::GravitySceneSplash(std::string &scene_file, Json::Value &roo
     m_vertices.num_tex_coords = static_cast<uint8_t>(vertices["texture coord groups"].asUInt());
     m_vertices.num_tex_coord_comps = static_cast<uint8_t>(vertices["texture coord components"].asUInt());
 
+    if (m_vertices.num_tex_coords > 1) {
+        logger.LogWarning("GravitySceneSplash::GravitySceneSplash - too many texcoords groups.");
+    }
+
     Json::Value vert_data = vertices["data"];
     m_vertices.data.resize(vert_data.size());
     uint8_t vert = 0;
@@ -85,6 +90,8 @@ GravitySceneSplash::GravitySceneSplash(std::string &scene_file, Json::Value &roo
             m_vertices.data[vert++] = cur_data.asFloat();
         }
     }
+
+    m_uniform_buffer.uniform_buffer = nullptr;
 }
 
 GravitySceneSplash::~GravitySceneSplash() {}
@@ -123,6 +130,18 @@ bool GravitySceneSplash::Load(GravityDeviceExtIf *dev_ext_if, GravityDeviceMemor
     }
     m_shader.shader = shader;
 
+    // Create and read the uniform buffer contents.  Again, don't actually load anything
+    m_uniform_buffer.size = 1024;  // Start with 1k
+    GravityUniformBuffer *uniform_buffer =
+        new GravityUniformBuffer(m_inst_ext_if, m_dev_ext_if, m_dev_memory_mgr, m_uniform_buffer.size);
+    if (nullptr == uniform_buffer) {
+        logger.LogError("GravitySceneSplash::Load - failed to allocate GravityUniformBuffer");
+        m_uniform_buffer.size = 0;
+        return false;
+    }
+    m_uniform_buffer.offset = 0;
+    m_uniform_buffer.uniform_buffer = uniform_buffer;
+
     return true;
 }
 
@@ -130,6 +149,47 @@ bool GravitySceneSplash::Start() {
     GravityLogger &logger = GravityLogger::getInstance();
     if (!m_texture.texture->Load()) {
         logger.LogError("GravitySceneSplash::Start - failed to load GravityTexture");
+        return false;
+    }
+    if (!m_uniform_buffer.uniform_buffer->Load()) {
+        logger.LogError("GravitySceneSplash::Start - failed to load GravityUniformBuffer");
+        return false;
+    }
+
+    // Fill in the uniform buffer first with an identify MVP, then the vertex data
+    float* uni_buf_data = reinterpret_cast<float*>(m_uniform_buffer.uniform_buffer->Map(0));
+    *uni_buf_data++ = 1.0f;
+    *uni_buf_data++ = 0.0f;
+    *uni_buf_data++ = 0.0f;
+    *uni_buf_data++ = 0.0f;
+    *uni_buf_data++ = 0.0f;
+    *uni_buf_data++ = 1.0f;
+    *uni_buf_data++ = 0.0f;
+    *uni_buf_data++ = 0.0f;
+    *uni_buf_data++ = 0.0f;
+    *uni_buf_data++ = 0.0f;
+    *uni_buf_data++ = 1.0f;
+    *uni_buf_data++ = 0.0f;
+    *uni_buf_data++ = 0.0f;
+    *uni_buf_data++ = 0.0f;
+    *uni_buf_data++ = 0.0f;
+    *uni_buf_data++ = 1.0f;
+
+    // Fill in vertex data
+    uint32_t stride = m_vertices.num_vert_comps + (m_vertices.num_tex_coords * m_vertices.num_tex_coord_comps);
+    for (uint32_t vert = 0; vert < m_vertices.data.size(); vert++) {
+        for (uint32_t comp = 0; comp < 8; comp++) {
+            if (comp < m_vertices.num_vert_comps + m_vertices.num_tex_coord_comps) {
+                *uni_buf_data++ = m_vertices.data[(vert * stride) + comp];
+            } else {
+                *uni_buf_data++ = 0.f;
+            }
+        }
+    }
+    m_uniform_buffer.uniform_buffer->Unmap();
+
+    if (!m_shader.shader->Load()) {
+        logger.LogError("GravitySceneSplash::Start - failed to load GravityShader");
         return false;
     }
     return true;
@@ -147,6 +207,14 @@ bool GravitySceneSplash::Draw() {
 
 bool GravitySceneSplash::End() {
     GravityLogger &logger = GravityLogger::getInstance();
+    if (!m_shader.shader->Unload()) {
+        logger.LogError("GravitySceneSplash::End - failed to unload GravityShader");
+        return false;
+    }
+    if (!m_uniform_buffer.uniform_buffer->Unload()) {
+        logger.LogError("GravitySceneSplash::End - failed to unload GravityUniformBuffer");
+        return false;
+    }
     if (!m_texture.texture->Unload()) {
         logger.LogError("GravitySceneSplash::End - failed to unload GravityTexture");
         return false;
@@ -155,6 +223,14 @@ bool GravitySceneSplash::End() {
 }
 
 bool GravitySceneSplash::Unload() {
+    if (nullptr != m_shader.shader) {
+        delete m_shader.shader;
+        m_shader.shader = nullptr;
+    }
+    if (nullptr != m_uniform_buffer.uniform_buffer) {
+        delete m_uniform_buffer.uniform_buffer;
+        m_uniform_buffer.uniform_buffer = nullptr;
+    }
     if (nullptr != m_texture.texture) {
         delete m_texture.texture;
         m_texture.texture = nullptr;

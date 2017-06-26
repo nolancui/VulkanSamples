@@ -1,5 +1,5 @@
 /*
- * LunarGravity - gravityshader.hpp
+ * LunarGravity - gravityuniformbuffer.hpp
  *
  * Copyright (C) 2017 LunarG, Inc.
  *
@@ -28,45 +28,35 @@ class GravityDeviceExtIf;
 struct GravityDeviceMemory;
 class GravityDeviceMemoryManager;
 
-enum GravityShaderStage {
-    GRAVITY_SHADER_VERTEX = 0,
-    GRAVITY_SHADER_TESSELLATION_CONTROL,
-    GRAVITY_SHADER_TESSELLATION_EVALUATION,
-    GRAVITY_SHADER_GEOMETRY,
-    GRAVITY_SHADER_FRAGMENT,
-    GRAVITY_SHADER_NUM_STAGES
-};
-
-struct GravityShaderData {
-    bool valid;
-    VkShaderStageFlagBits vk_shader_flag;
-    VkShaderModule vk_shader_module;
-};
-
-class GravityShader {
+class GravityUniformBuffer {
    public:
     // Create a protected constructor
-    GravityShader(GravityInstanceExtIf *inst_ext_if, GravityDeviceExtIf *dev_ext_if, GravityDeviceMemoryManager *dev_memory);
+    GravityUniformBuffer(GravityInstanceExtIf *inst_ext_if, GravityDeviceExtIf *dev_ext_if, GravityDeviceMemoryManager *dev_memory,
+                         uint32_t size);
 
     // We don't want any copy constructors
-    GravityShader(const GravityShader &shader) = delete;
-    GravityShader &operator=(const GravityShader &shader) = delete;
+    GravityUniformBuffer(const GravityUniformBuffer &uniform_buffer) = delete;
+    GravityUniformBuffer &operator=(const GravityUniformBuffer &uniform_buffer) = delete;
 
     // Make the destructor public
-    virtual ~GravityShader();
+    virtual ~GravityUniformBuffer();
 
-    bool Read(std::string const &shader_prefix);
     bool Load();
+    void *Map(uint32_t offset);
+    void Unmap();
+    bool Bind(uint32_t offset);
     bool Unload();
+    uint32_t Size() { return m_size; }
 
    protected:
     GravityInstanceExtIf *m_inst_ext_if;
     GravityDeviceExtIf *m_dev_ext_if;
     GravityDeviceMemoryManager *m_dev_memory_mgr;
 
-    bool m_read;
-    std::string m_shader_prefix;
-    GravityShaderData m_shader_data[GRAVITY_SHADER_NUM_STAGES];
+    uint32_t m_size;
+    VkBuffer m_vk_buffer;
+    GravityDeviceMemory m_memory;
+    void *m_cpu_addr;
 
     void Cleanup();
 };

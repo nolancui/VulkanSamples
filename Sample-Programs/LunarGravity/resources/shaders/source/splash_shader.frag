@@ -1,7 +1,6 @@
 /*
- * Copyright (c) 2015-2016 The Khronos Group Inc.
- * Copyright (c) 2015-2016 Valve Corporation
- * Copyright (c) 2015-2016 LunarG, Inc.
+ * Copyright (c) 2017 Valve Corporation
+ * Copyright (c) 2017 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,15 +15,18 @@
  * limitations under the License.
  */
 /*
- * Fragment shader for cube demo
+ * Fragment shader used by splash screen scene
  */
 #version 400
+
 #extension GL_ARB_separate_shader_objects : enable
 #extension GL_ARB_shading_language_420pack : enable
-layout (binding = 1) uniform sampler2D tex;
+
+layout (binding = 1) uniform sampler2D tex2dSampler;
 
 layout (location = 0) in vec4 texcoord;
-layout (location = 0) out vec4 uFragColor;
+layout (location = 0) out vec4 fragmentColor;
+
 void main() {
-   uFragColor = texture(tex, texcoord.xy);
+   fragmentColor = texture(tex2dSampler, texcoord.xy);
 }

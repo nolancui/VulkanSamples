@@ -41,8 +41,6 @@ GravityShader::GravityShader(GravityInstanceExtIf *inst_ext_if, GravityDeviceExt
     m_inst_ext_if = inst_ext_if;
     m_dev_ext_if = dev_ext_if;
     m_dev_memory_mgr = dev_memory_mgr;
-    memset(&m_memory, 0, sizeof(GravityDeviceMemory));
-    m_memory.vk_device_memory = VK_NULL_HANDLE;
 }
 
 GravityShader::~GravityShader() {
@@ -50,9 +48,6 @@ GravityShader::~GravityShader() {
 }
 
 void GravityShader::Cleanup() {
-    if (VK_NULL_HANDLE != m_memory.vk_device_memory) {
-        Unload();
-    }
     for (uint8_t shader = 0; shader < GRAVITY_SHADER_NUM_STAGES; shader++) {
         if (VK_NULL_HANDLE != m_shader_data[shader].vk_shader_module) {
             vkDestroyShaderModule(m_dev_ext_if->m_device, m_shader_data[shader].vk_shader_module, NULL);
@@ -148,9 +143,9 @@ bool GravityShader::Read(std::string const &shader_prefix) {
 }
 
 bool GravityShader::Load() {
-    return false;
+    return true;
 }
 
 bool GravityShader::Unload() {
-    return false;
+    return true;
 }

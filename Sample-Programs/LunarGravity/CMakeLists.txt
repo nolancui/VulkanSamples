@@ -129,6 +129,8 @@ set(EXECUTABLE_FILES
     ${GRAVITY_OS_SOURCES}
     engine/gravitydevicememory.cpp
     engine/gravitydevicememory.hpp
+    engine/gravityuniformbuffer.cpp
+    engine/gravityuniformbuffer.hpp
     engine/gravityshader.cpp
     engine/gravityshader.hpp
     engine/gravitytexture.cpp

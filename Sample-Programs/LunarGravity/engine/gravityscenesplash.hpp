@@ -26,6 +26,7 @@
 
 class GravityTexture;
 class GravityShader;
+class GravityUniformBuffer;
 
 struct SplashTexture {
     std::string name;
@@ -45,6 +46,12 @@ struct SplashShaderVerts {
     uint8_t num_tex_coords;
     uint8_t num_tex_coord_comps;
     std::vector<float> data;
+};
+
+struct SplashUniformBuffer {
+    uint32_t size;
+    uint32_t offset;
+    GravityUniformBuffer *uniform_buffer;
 };
 
 class GravitySceneSplash : public GravityScene {
@@ -69,5 +76,6 @@ class GravitySceneSplash : public GravityScene {
 
     SplashShader m_shader;
     SplashTexture m_texture;
+    SplashUniformBuffer m_uniform_buffer;
     SplashShaderVerts m_vertices;
 };

@@ -1,7 +1,6 @@
 /*
- * Copyright (c) 2015-2016 The Khronos Group Inc.
- * Copyright (c) 2015-2016 Valve Corporation
- * Copyright (c) 2015-2016 LunarG, Inc.
+ * Copyright (c) 2017 Valve Corporation
+ * Copyright (c) 2017 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,21 +15,27 @@
  * limitations under the License.
  */
 /*
- * Vertex shader used by Cube demo.
+ * Vertex shader used by splash screen scene
  */
 #version 400
 #extension GL_ARB_separate_shader_objects : enable
 #extension GL_ARB_shading_language_420pack : enable
+
+struct VtxData
+{
+  vec4 position;
+  vec4 texcoord;
+};
+
 layout(std140, binding = 0) uniform buf {
-        mat4 MVP;
-        vec4 position[12*3];
-        vec4 attr[12*3];
+        mat4 modelviewprojectmat;
+        VtxData vertexdata[6];
 } ubuf;
 
 layout (location = 0) out vec4 texcoord;
 
 void main() 
 {
-   texcoord = ubuf.attr[gl_VertexIndex];
-   gl_Position = ubuf.MVP * ubuf.position[gl_VertexIndex];
+   texcoord = ubuf.vertexdata[gl_VertexIndex].texcoord;
+   gl_Position = ubuf.modelviewprojectmat * ubuf.vertexdata[gl_VertexIndex].position;
 }
