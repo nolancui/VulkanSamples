@@ -81,21 +81,17 @@ bool GravityUniformBuffer::Load() {
     return true;
 }
 
-void *GravityUniformBuffer::Map(uint32_t offset) {
+void *GravityUniformBuffer::Map(uint64_t offset, uint64_t size) {
     GravityLogger &logger = GravityLogger::getInstance();
-    VkResult vk_result =
-        vkMapMemory(m_dev_ext_if->m_device, m_memory.vk_device_memory, offset, m_memory.vk_mem_reqs.size, 0, &m_cpu_addr);
-    if (VK_SUCCESS != vk_result) {
-        std::string error_msg = "GravityUniformBuffer::Map failed vkMapMemory with error ";
-        error_msg += vk_result;
-        logger.LogError(error_msg);
+    if (!m_dev_memory_mgr->MapMemory(m_memory, offset, size, &m_cpu_addr)) {
+        logger.LogError("GravityUniformBuffer::Map m_dev_memory_mgr->MapMemory failed");
         return nullptr;
     }
     return m_cpu_addr;
 }
 
 void GravityUniformBuffer::Unmap() {
-    vkUnmapMemory(m_dev_ext_if->m_device, m_memory.vk_device_memory);
+    m_dev_memory_mgr->UnmapMemory(m_memory);
     m_cpu_addr = nullptr;
 }
 

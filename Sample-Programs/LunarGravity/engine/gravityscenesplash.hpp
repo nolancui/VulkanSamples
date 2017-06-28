@@ -78,4 +78,7 @@ class GravitySceneSplash : public GravityScene {
     SplashTexture m_texture;
     SplashUniformBuffer m_uniform_buffer;
     SplashShaderVerts m_vertices;
+
+    VkDescriptorSetLayout m_vk_desc_set_layout;
+    VkPipelineLayout m_pipeline_layout;
 };

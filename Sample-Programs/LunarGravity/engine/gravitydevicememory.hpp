@@ -43,6 +43,8 @@ class GravityDeviceMemoryManager {
     void SetupDevIf(GravityDeviceExtIf *dev_ext_if);
 
     bool AllocateMemory(GravityDeviceMemory &memory, const VkMemoryPropertyFlags &flags);
+    bool MapMemory(GravityDeviceMemory &memory, VkDeviceSize offset, VkDeviceSize size, void** ppData);
+    void UnmapMemory(GravityDeviceMemory &memory);
     bool FreeMemory(GravityDeviceMemory &memory);
 
    private:
@@ -50,4 +52,5 @@ class GravityDeviceMemoryManager {
     GravityDeviceExtIf *m_dev_ext_if;
     VkPhysicalDevice *m_vk_phys_dev;
     VkPhysicalDeviceMemoryProperties m_vk_dev_mem_props;
+    VkPhysicalDeviceLimits m_vk_dev_limits;
 };

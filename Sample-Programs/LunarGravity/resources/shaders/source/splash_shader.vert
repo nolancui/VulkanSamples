@@ -24,7 +24,7 @@
 struct VtxData
 {
   vec4 position;
-  vec4 texcoord;
+  vec2 texcoord;
 };
 
 layout(std140, binding = 0) uniform buf {
@@ -32,7 +32,7 @@ layout(std140, binding = 0) uniform buf {
         VtxData vertexdata[6];
 } ubuf;
 
-layout (location = 0) out vec4 texcoord;
+layout (location = 0) out vec2 texcoord;
 
 void main() 
 {

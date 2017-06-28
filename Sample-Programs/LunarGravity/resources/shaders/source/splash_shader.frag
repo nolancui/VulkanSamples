@@ -24,9 +24,9 @@
 
 layout (binding = 1) uniform sampler2D tex2dSampler;
 
-layout (location = 0) in vec4 texcoord;
+layout (location = 0) in vec2 texcoord;
 layout (location = 0) out vec4 fragmentColor;
 
 void main() {
-   fragmentColor = texture(tex2dSampler, texcoord.xy);
+   fragmentColor = texture(tex2dSampler, texcoord);
 }

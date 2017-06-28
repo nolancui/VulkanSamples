@@ -42,7 +42,7 @@ class GravityUniformBuffer {
     virtual ~GravityUniformBuffer();
 
     bool Load();
-    void *Map(uint32_t offset);
+    void *Map(uint64_t offset, uint64_t size);
     void Unmap();
     bool Bind(uint32_t offset);
     bool Unload();

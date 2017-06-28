@@ -19,6 +19,7 @@
  */
 
 #include "gravitylogger.hpp"
+#include "gravitydeviceextif.hpp"
 #include "gravitydevicememory.hpp"
 #include "gravitytexture.hpp"
 #include "gravityshader.hpp"
@@ -131,7 +132,7 @@ bool GravitySceneSplash::Load(GravityDeviceExtIf *dev_ext_if, GravityDeviceMemor
     m_shader.shader = shader;
 
     // Create and read the uniform buffer contents.  Again, don't actually load anything
-    m_uniform_buffer.size = 1024;  // Start with 1k
+    m_uniform_buffer.size = 20480;  // Start with 20k
     GravityUniformBuffer *uniform_buffer =
         new GravityUniformBuffer(m_inst_ext_if, m_dev_ext_if, m_dev_memory_mgr, m_uniform_buffer.size);
     if (nullptr == uniform_buffer) {
@@ -157,7 +158,10 @@ bool GravitySceneSplash::Start() {
     }
 
     // Fill in the uniform buffer first with an identify MVP, then the vertex data
-    float* uni_buf_data = reinterpret_cast<float*>(m_uniform_buffer.uniform_buffer->Map(0));
+    uint32_t stride = m_vertices.num_vert_comps + (m_vertices.num_tex_coords * m_vertices.num_tex_coord_comps);
+    uint64_t num_verts = m_vertices.data.size() / stride;
+    uint64_t data_size = sizeof(float) * (16 + num_verts * (m_vertices.num_vert_comps + (m_vertices.num_tex_coords * 4)));
+    float *uni_buf_data = reinterpret_cast<float *>(m_uniform_buffer.uniform_buffer->Map(0, data_size));
     *uni_buf_data++ = 1.0f;
     *uni_buf_data++ = 0.0f;
     *uni_buf_data++ = 0.0f;
@@ -176,13 +180,10 @@ bool GravitySceneSplash::Start() {
     *uni_buf_data++ = 1.0f;
 
     // Fill in vertex data
-    uint32_t stride = m_vertices.num_vert_comps + (m_vertices.num_tex_coords * m_vertices.num_tex_coord_comps);
     for (uint32_t vert = 0; vert < m_vertices.data.size(); vert++) {
-        for (uint32_t comp = 0; comp < 8; comp++) {
+        for (uint32_t comp = 0; comp < 6; comp++) {
             if (comp < m_vertices.num_vert_comps + m_vertices.num_tex_coord_comps) {
                 *uni_buf_data++ = m_vertices.data[(vert * stride) + comp];
-            } else {
-                *uni_buf_data++ = 0.f;
             }
         }
     }
@@ -192,6 +193,47 @@ bool GravitySceneSplash::Start() {
         logger.LogError("GravitySceneSplash::Start - failed to load GravityShader");
         return false;
     }
+
+    VkDescriptorSetLayoutBinding layout_bindings[2] = {};
+    layout_bindings[0].binding = 0;
+    layout_bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    layout_bindings[0].descriptorCount = 1;
+    layout_bindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    layout_bindings[0].pImmutableSamplers = nullptr;
+    layout_bindings[1].binding = 1;
+    layout_bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    layout_bindings[1].descriptorCount = 1;
+    layout_bindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    layout_bindings[1].pImmutableSamplers = nullptr;
+
+    VkDescriptorSetLayoutCreateInfo descriptor_layout = {};
+    descriptor_layout.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    descriptor_layout.pNext = NULL;
+    descriptor_layout.bindingCount = 2;
+    descriptor_layout.pBindings = layout_bindings;
+
+    VkResult vk_result = vkCreateDescriptorSetLayout(m_dev_ext_if->m_device, &descriptor_layout, nullptr, &m_vk_desc_set_layout);
+    if (VK_SUCCESS != vk_result) {
+        std::string error_msg = "GravitySceneSplash::Start failed vkCreateDescriptorSetLayout with error ";
+        error_msg += vk_result;
+        logger.LogError(error_msg);
+        return false;
+    }
+
+    VkPipelineLayoutCreateInfo pipeline_create_info = {};
+    pipeline_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    pipeline_create_info.pNext = nullptr;
+    pipeline_create_info.setLayoutCount = 1;
+    pipeline_create_info.pSetLayouts = &m_vk_desc_set_layout;
+
+    vk_result = vkCreatePipelineLayout(m_dev_ext_if->m_device, &pipeline_create_info, nullptr, &m_pipeline_layout);
+    if (VK_SUCCESS != vk_result) {
+        std::string error_msg = "GravitySceneSplash::Start failed vkCreatePipelineLayout with error ";
+        error_msg += vk_result;
+        logger.LogError(error_msg);
+        return false;
+    }
+
     return true;
 }
 

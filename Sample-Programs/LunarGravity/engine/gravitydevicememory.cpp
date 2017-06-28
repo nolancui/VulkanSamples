@@ -30,6 +30,7 @@
 #include "gravitydevicememory.hpp"
 
 GravityDeviceMemoryManager::GravityDeviceMemoryManager(GravityInstanceExtIf *inst_ext_if, VkPhysicalDevice *phys_dev) {
+    VkPhysicalDeviceProperties phys_dev_props;
     m_inst_ext_if = inst_ext_if;
     m_dev_ext_if = nullptr;
     m_vk_phys_dev = phys_dev;
@@ -37,6 +38,10 @@ GravityDeviceMemoryManager::GravityDeviceMemoryManager(GravityInstanceExtIf *ins
 
     // Get Memory information and properties
     vkGetPhysicalDeviceMemoryProperties(*phys_dev, &m_vk_dev_mem_props);
+
+    // Get the Memory limits
+    vkGetPhysicalDeviceProperties(*phys_dev, &phys_dev_props);
+    m_vk_dev_limits = phys_dev_props.limits;
 }
 
 GravityDeviceMemoryManager::~GravityDeviceMemoryManager() {
@@ -44,9 +49,7 @@ GravityDeviceMemoryManager::~GravityDeviceMemoryManager() {
     m_dev_ext_if = nullptr;
 }
 
-void GravityDeviceMemoryManager::SetupDevIf(GravityDeviceExtIf *dev_ext_if) {
-    m_dev_ext_if = dev_ext_if;
-}
+void GravityDeviceMemoryManager::SetupDevIf(GravityDeviceExtIf *dev_ext_if) { m_dev_ext_if = dev_ext_if; }
 
 bool GravityDeviceMemoryManager::AllocateMemory(GravityDeviceMemory &memory, const VkMemoryPropertyFlags &flags) {
     GravityLogger &logger = GravityLogger::getInstance();
@@ -79,25 +82,46 @@ bool GravityDeviceMemoryManager::AllocateMemory(GravityDeviceMemory &memory, con
     }
 
     if (m_vk_dev_mem_props.memoryHeaps[memory.vk_memory_heap_index].size < memory.vk_mem_reqs.size) {
-        logger.LogError(
-            "GravityDeviceMemory::AllocateMemory not enough memory remaining in that heap");
+        logger.LogError("GravityDeviceMemory::AllocateMemory not enough memory remaining in that heap");
         return false;
     }
-    
+
     m_vk_dev_mem_props.memoryHeaps[memory.vk_memory_heap_index].size -= memory.vk_mem_reqs.size;
 
     // Allocate memory for the depth/stencil buffer
     vk_result = vkAllocateMemory(m_dev_ext_if->m_device, &mem_alloc_info, nullptr, &memory.vk_device_memory);
     if (VK_SUCCESS != vk_result) {
-        std::string error_msg =
-            "GravityDeviceMemory::AllocateMemory failed to allocate device memory "
-            "with error ";
+        std::string error_msg = "GravityDeviceMemory::AllocateMemory failed to allocate device memory with error ";
         error_msg += vk_result;
         logger.LogError(error_msg);
         return false;
     }
 
     return true;
+}
+
+bool GravityDeviceMemoryManager::MapMemory(GravityDeviceMemory &memory, VkDeviceSize offset, VkDeviceSize size, void **ppData) {
+    GravityLogger &logger = GravityLogger::getInstance();
+    if (((m_vk_dev_limits.minMemoryMapAlignment - 1) & offset) != 0) {
+        std::string error_msg = "GravityDeviceMemory::MapMemory offset ";
+        error_msg += std::to_string(offset);
+        error_msg += " does not meet alignment requirements of ";
+        error_msg += std::to_string(m_vk_dev_limits.minMemoryMapAlignment);
+        logger.LogError(error_msg);
+        return false;
+    }
+    VkResult vk_result = vkMapMemory(m_dev_ext_if->m_device, memory.vk_device_memory, offset, size, 0, ppData);
+    if (VK_SUCCESS != vk_result) {
+        std::string error_msg = "GravityDeviceMemory::MapMemory failed to map device memory with error ";
+        error_msg += vk_result;
+        logger.LogError(error_msg);
+        return false;
+    }
+    return true;
+}
+
+void GravityDeviceMemoryManager::UnmapMemory(GravityDeviceMemory &memory) {
+    vkUnmapMemory(m_dev_ext_if->m_device, memory.vk_device_memory);
 }
 
 bool GravityDeviceMemoryManager::FreeMemory(GravityDeviceMemory &memory) {
